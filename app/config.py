@@ -5,11 +5,11 @@ import os
 
 
 class Settings(BaseSettings):
-    # Telegram
-    telegram_bot_token: str = Field(..., env="TELEGRAM_BOT_TOKEN")
+    # Telegram (not required for dashboard-only deployments)
+    telegram_bot_token: str = Field("", env="TELEGRAM_BOT_TOKEN")
 
-    # OpenAI
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    # OpenAI (not required for dashboard-only deployments)
+    openai_api_key: str = Field("", env="OPENAI_API_KEY")
     openai_model: str = Field("gpt-4o-mini", env="OPENAI_MODEL")
     openai_vision_model: str = Field("gpt-4o", env="OPENAI_VISION_MODEL")
 
