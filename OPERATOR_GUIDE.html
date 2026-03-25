@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Helias FinPilot — Operator & Onboarding Guide</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f7f8fc;
+    }
+
+    /* ── Cover ── */
+    .cover {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+      color: white;
+      padding: 60px 50px 50px;
+      position: relative;
+    }
+    .cover .logo {
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      opacity: 0.6;
+      margin-bottom: 20px;
+    }
+    .cover h1 {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .cover h1 span { color: #e94560; }
+    .cover .subtitle {
+      font-size: 16px;
+      opacity: 0.75;
+      margin-bottom: 30px;
+    }
+    .cover .meta {
+      display: flex;
+      gap: 30px;
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 30px;
+    }
+
+    /* ── TOC ── */
+    .toc {
+      background: white;
+      border-radius: 12px;
+      padding: 30px 35px;
+      margin-bottom: 40px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .toc h2 {
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #0f3460;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e94560;
+    }
+    .toc ol {
+      padding-left: 20px;
+    }
+    .toc li {
+      margin-bottom: 6px;
+      color: #0f3460;
+      font-weight: 500;
+    }
+    .toc li span {
+      font-weight: 400;
+      color: #555;
+      font-size: 13px;
+    }
+
+    /* ── Sections ── */
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 35px 40px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+    .section-number {
+      background: #0f3460;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .section h2 {
+      font-size: 20px;
+      color: #0f3460;
+      font-weight: 700;
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f3460;
+      margin: 22px 0 10px;
+    }
+
+    p { margin-bottom: 12px; }
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: #0f3460;
+      color: white;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f9fafc; }
+    tr:hover td { background: #f0f4ff; }
+
+    /* ── Code ── */
+    pre {
+      background: #1a1a2e;
+      color: #a8d8a8;
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    code {
+      background: #f0f4ff;
+      color: #0f3460;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* ── Callout boxes ── */
+    .callout {
+      border-left: 4px solid #e94560;
+      background: #fff5f6;
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout.info {
+      border-color: #0f3460;
+      background: #f0f4ff;
+    }
+    .callout.success {
+      border-color: #27ae60;
+      background: #f0fff4;
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ── Bot preview ── */
+    .bot-preview {
+      background: #e8f5e9;
+      border-radius: 12px;
+      padding: 18px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      margin: 16px 0;
+      border: 1px solid #c8e6c9;
+    }
+    .bot-preview .bot-name {
+      font-weight: bold;
+      color: #1b5e20;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Check/X lists ── */
+    .check-list { list-style: none; padding: 0; }
+    .check-list li { padding: 5px 0; padding-left: 28px; position: relative; font-size: 14px; }
+    .check-list li::before {
+      position: absolute; left: 0; font-size: 16px;
+    }
+    .check-list li.yes::before { content: "✅"; }
+    .check-list li.no::before  { content: "❌"; }
+
+    /* ── Pricing cards ── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .pricing-card {
+      border: 2px solid #eee;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .pricing-card.highlight { border-color: #e94560; }
+    .pricing-card .tier { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+    .pricing-card .price { font-size: 24px; font-weight: 700; color: #0f3460; margin: 6px 0; }
+    .pricing-card .price span { font-size: 14px; font-weight: 400; color: #888; }
+    .pricing-card .desc { font-size: 13px; color: #555; }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step; }
+    .step {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .step-num {
+      background: #e94560;
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body h4 { font-size: 15px; font-weight: 700; color: #0f3460; margin-bottom: 6px; }
+    .step-body p { font-size: 14px; color: #444; margin: 0; }
+
+    /* ── FAQ ── */
+    .faq-item { margin-bottom: 20px; }
+    .faq-q { font-weight: 700; color: #0f3460; margin-bottom: 5px; }
+    .faq-q::before { content: "Q: "; color: #e94560; }
+    .faq-a { font-size: 14px; color: #444; padding-left: 18px; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 30px;
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { background: white; }
+      .section { box-shadow: none; border: 1px solid #eee; }
+      .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="logo">Helias AI and Analytics</div>
+  <h1>Helias <span>FinPilot</span></h1>
+  <div class="subtitle">Operator &amp; Client Onboarding Guide</div>
+  <div class="meta">
+    <span>Version 1.0 — Phase 1 MVP</span>
+    <span>Updated: March 25, 2026</span>
+    <span>Internal Use Only</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li>How the Bot Works <span>— Client-facing explanation</span></li>
+      <li>Onboarding a New SME Client <span>— Step-by-step setup</span></li>
+      <li>What to Tell Clients <span>— Capabilities, limitations, privacy</span></li>
+      <li>Pricing Guidance <span>— Suggested tiers in ETB</span></li>
+      <li>Common Questions &amp; Answers <span>— FAQ for clients</span></li>
+      <li>Operator Maintenance <span>— Restart, logs, backup</span></li>
+      <li>Upgrade Path to SaaS <span>— Phase 2 roadmap</span></li>
+    </ol>
+  </div>
+
+  <!-- Section 1 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <h2>How the Bot Works</h2>
+    </div>
+
+    <h3>1.1 — Sending a Transaction</h3>
+    <p>The client types a message in plain language directly in Telegram. No forms, no app, no spreadsheet.</p>
+
+    <table>
+      <thead><tr><th>Client Types</th><th>Bot Extracts</th></tr></thead>
+      <tbody>
+        <tr><td><code>Paid 3,500 ETB to Ethio Telecom for internet</code></td><td>Expense · 3,500 ETB · Ethio Telecom · Internet &amp; Telecom</td></tr>
+        <tr><td><code>Received $400 from Addis Tech for consulting</code></td><td>Income · 400 USD · Addis Tech · Consulting</td></tr>
+        <tr><td><code>Bought 2 chairs, 4,800 birr cash</code></td><td>Expense · 4,800 ETB · Equipment · Cash</td></tr>
+        <tr><td><em>(send a photo of a receipt)</em></td><td>All fields extracted using AI vision</td></tr>
+      </tbody>
+    </table>
+
+    <h3>1.2 — Confirmation Flow</h3>
+    <p>After every message or file, the bot shows a preview and waits for approval before saving anything.</p>
+
+    <div class="bot-preview">
+      <div class="bot-name">Helias_FinPilot · bot</div>
+      💸 <strong>Extracted Transaction</strong><br><br>
+      Type: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; expense<br>
+      Amount: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3,500 ETB<br>
+      Date: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2026-03-25<br>
+      Counterparty: Ethio Telecom<br>
+      Description: &nbsp;internet service<br>
+      Category: &nbsp;&nbsp;&nbsp; Internet &amp; Telecom<br>
+      Confidence: &nbsp; 100%<br><br>
+      Is this correct? Reply:<br>
+      &nbsp;&nbsp;✅ <strong>yes</strong> — save it<br>
+      &nbsp;&nbsp;❌ <strong>no</strong> — discard it<br>
+      &nbsp;&nbsp;✏️ <strong>edit</strong> — correct a field
+    </div>
+
+    <p>The client replies <strong>yes</strong>, <strong>no</strong>, or <strong>edit</strong>. Nothing is saved until the client confirms.</p>
+
+    <h3>1.3 — Supported File Types</h3>
+    <p>Clients can send photos, PDFs, and screenshots directly in Telegram. The AI reads the content automatically.</p>
+
+    <table>
+      <thead><tr><th>File Type</th><th>Examples</th></tr></thead>
+      <tbody>
+        <tr><td>Photos</td><td>Receipts, invoices, handwritten notes, bank slips</td></tr>
+        <tr><td>PDF documents</td><td>Bank statements, formal invoices, contracts</td></tr>
+        <tr><td>Screenshots</td><td>Mobile payment confirmations, online receipts</td></tr>
+      </tbody>
+    </table>
+
+    <h3>1.4 — Available Commands</h3>
+    <table>
+      <thead><tr><th>Command</th><th>What It Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>/start</code></td><td>Register with the system</td></tr>
+        <tr><td><code>/help</code></td><td>Show all commands</td></tr>
+        <tr><td><code>/transactions</code></td><td>List recent 15 transactions</td></tr>
+        <tr><td><code>/pending</code></td><td>Show unconfirmed entries</td></tr>
+        <tr><td><code>/summary</code></td><td>Quick income / expense snapshot for this month</td></tr>
+        <tr><td><code>/monthly_report</code></td><td>Full report for current month with AI summary</td></tr>
+        <tr><td><code>/report 2026-03</code></td><td>Report for any specific month</td></tr>
+        <tr><td><code>/annual_report</code></td><td>Full year report with AI narrative</td></tr>
+        <tr><td><code>/search Ethio Telecom</code></td><td>Find transactions by keyword</td></tr>
+        <tr><td><code>/export</code></td><td>Download all confirmed transactions as CSV</td></tr>
+        <tr><td><code>/delete 42</code></td><td>Remove a wrong entry by its ID number</td></tr>
+      </tbody>
+    </table>
+
+    <h3>1.5 — Fixing a Wrong Entry</h3>
+    <div class="callout">
+      <strong>Three easy steps:</strong>
+      1. Send <code>/transactions</code> — find the ID number (e.g. #12)<br>
+      2. Send <code>/delete 12</code> — removes it from reports<br>
+      3. Re-type the correct transaction as a new message
+    </div>
+  </div>
+
+  <!-- Section 2 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">2</div>
+      <h2>Onboarding a New SME Client</h2>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Create a Telegram Bot for the Client</h4>
+          <p>Open Telegram → search <strong>@BotFather</strong> → send <code>/newbot</code> → choose a name and username (must end in <em>bot</em>, e.g. <code>acme_finance_bot</code>) → copy the token.</p>
+          <div class="callout">Each client gets their own dedicated bot. Never share one bot between multiple companies.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Configure the .env File</h4>
+          <p>Create a new <code>.env</code> file with the client's details:</p>
+          <pre>TELEGRAM_BOT_TOKEN=&lt;their bot token&gt;
+OPENAI_API_KEY=&lt;your shared OpenAI key&gt;
+DATABASE_URL=sqlite:///./finpilot_acme.db
+DEFAULT_COMPANY_NAME=Acme Trading PLC
+DEFAULT_COMPANY_CURRENCY=ETB
+DEFAULT_ADMIN_TELEGRAM_ID=&lt;client's Telegram user ID&gt;</pre>
+          <p>To get the client's Telegram ID: ask them to message <strong>@userinfobot</strong> on Telegram — it replies with their ID number.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Install and Run</h4>
+          <pre>python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python scripts/seed_data.py
+nohup python -m app.main > finpilot.log 2>&1 &</pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Customise Categories (Optional)</h4>
+          <p>Default categories are seeded automatically. For specialised businesses, categories can be adjusted before first run. Example for a restaurant: replace <em>Cloud &amp; API Costs</em> with <em>Food &amp; Ingredients</em>, <em>Contractors</em> with <em>Kitchen Staff</em>.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h4>Test Before Handover</h4>
+          <p>Verify these 5 things work before giving the bot to the client:</p>
+          <table>
+            <tbody>
+              <tr><td>1.</td><td>Send a text transaction → bot extracts correctly</td></tr>
+              <tr><td>2.</td><td>Send a receipt photo → bot reads from image</td></tr>
+              <tr><td>3.</td><td><code>/summary</code> → shows correct totals</td></tr>
+              <tr><td>4.</td><td><code>/monthly_report</code> → generates report</td></tr>
+              <tr><td>5.</td><td><code>/delete 1</code> → removes test transaction</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h4>Hand Over to Client</h4>
+          <p>Share the bot username with the client (e.g. <code>@acme_finance_bot</code>). They open it in Telegram and send <code>/start</code>. Done.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Section 3 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <h2>What to Tell Clients</h2>
+    </div>
+
+    <h3>What the bot CAN do</h3>
+    <ul class="check-list">
+      <li class="yes">Record income and expenses from plain text or photos</li>
+      <li class="yes">Categorise transactions automatically using AI</li>
+      <li class="yes">Generate monthly and annual financial summaries</li>
+      <li class="yes">Export data as CSV for sharing with an accountant</li>
+      <li class="yes">Store all receipts and invoices permanently</li>
+      <li class="yes">Ask clarifying questions when something is unclear</li>
+      <li class="yes">Support ETB, USD, and EUR</li>
+      <li class="yes">Track every change with a full audit trail</li>
+    </ul>
+
+    <h3>What the bot CANNOT do (Phase 1)</h3>
+    <ul class="check-list">
+      <li class="no">Connect directly to a bank account</li>
+      <li class="no">File taxes or calculate tax liability automatically</li>
+      <li class="no">Handle payroll calculations</li>
+      <li class="no">Support multiple users simultaneously (coming Phase 2)</li>
+      <li class="no">Work without internet connection</li>
+      <li class="no">Replace a certified accountant for official audit purposes</li>
+    </ul>
+
+    <h3>Data &amp; Privacy</h3>
+    <div class="callout info">
+      <strong>What clients must know:</strong>
+      All transaction data is stored on a private server. Transaction text is sent to OpenAI for AI processing only — the full financial database stays on the private server. No data is shared with third parties other than OpenAI's extraction service.
+    </div>
+  </div>
+
+  <!-- Section 4 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <h2>Pricing Guidance</h2>
+    </div>
+
+    <p>Suggested monthly pricing for selling to Ethiopian SMEs. Prices are in ETB and can be collected via Chapa.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="tier">Starter</div>
+        <div class="price">500 ETB <span>/ month</span></div>
+        <div class="desc">Solo traders, freelancers. 1 user, 100 transactions/month, monthly report.</div>
+      </div>
+      <div class="pricing-card highlight">
+        <div class="tier">Business ★ Most Popular</div>
+        <div class="price">1,500 ETB <span>/ month</span></div>
+        <div class="desc">SMEs (5–20 employees). 3 users, unlimited transactions, annual report.</div>
+      </div>
+      <div class="pricing-card">
+        <div class="tier">Professional</div>
+        <div class="price">3,500 ETB <span>/ month</span></div>
+        <div class="desc">Growing companies. 10 users, multi-currency, custom categories, export.</div>
+      </div>
+      <div class="pricing-card">
+        <div class="tier">Enterprise</div>
+        <div class="price">Custom</div>
+        <div class="desc">Large SMEs. Dedicated server, custom integrations, staff training included.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>One-time setup fee:</strong> 2,000 – 5,000 ETB depending on customisation needed (categories, branding, training session).
+    </div>
+  </div>
+
+  <!-- Section 5 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <h2>Common Client Questions</h2>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What if I send the wrong amount?</div>
+      <div class="faq-a">Use <code>/transactions</code> to find the ID, then <code>/delete [ID]</code>. Re-send the correct message immediately after.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What if the bot misunderstands my message?</div>
+      <div class="faq-a">Reply <strong>no</strong> when it shows the preview. Then try again with more detail — include the exact amount, currency, and who you paid.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can I use it in Amharic?</div>
+      <div class="faq-a">The AI understands some Amharic context, but English works more reliably in the current version. Full Amharic support is planned for the next version.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What currencies does it support?</div>
+      <div class="faq-a">ETB (Birr), USD, and EUR. Always mention the currency in your message if it is not ETB.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can my accountant access the reports?</div>
+      <div class="faq-a">Use <code>/export</code> to download a CSV file, then share it by email or WhatsApp. A web dashboard for accountants is coming in the next version.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What happens if the internet goes down?</div>
+      <div class="faq-a">The bot is unavailable during outages. Messages sent during that time are queued by Telegram and processed automatically when the connection returns.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is my financial data safe?</div>
+      <div class="faq-a">Yes. Data is stored on a private server. Only the transaction text is sent to the AI service for extraction — your full financial history never leaves the private server.</div>
+    </div>
+  </div>
+
+  <!-- Section 6 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">6</div>
+      <h2>Operator Maintenance</h2>
+    </div>
+
+    <h3>Check if the bot is running</h3>
+    <pre>ps aux | grep "app.main" | grep -v grep</pre>
+    <p>If you see a result with a process ID — it is running. If you only see the grep command itself — it has stopped.</p>
+
+    <h3>Restart the bot</h3>
+    <pre>pkill -f "app.main"
+cd /path/to/Financial_Reporting_AI
+nohup venv/bin/python3 -m app.main > finpilot.log 2>&1 &</pre>
+
+    <h3>View logs</h3>
+    <pre>tail -f finpilot.log        # live stream
+tail -100 finpilot.log      # last 100 lines
+grep "ERROR" finpilot.log   # errors only</pre>
+
+    <h3>Back up client data</h3>
+    <pre>cp finpilot.db backups/finpilot_$(date +%Y-%m-%d).db</pre>
+    <div class="callout info">
+      <strong>Recommendation:</strong> Set up a daily automatic backup using macOS cron or launchd. Contact the Helias tech team for the configuration file.
+    </div>
+  </div>
+
+  <!-- Section 7 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">7</div>
+      <h2>Upgrade Path to SaaS</h2>
+    </div>
+
+    <p>The current system is already architected for multi-tenant SaaS. All data is isolated by <code>company_id</code> in the database — no migration needed to upgrade.</p>
+
+    <table>
+      <thead><tr><th>Phase</th><th>Feature</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Phase 1</td><td>Telegram bot, AI extraction, reports, audit log</td><td>✅ Complete</td></tr>
+        <tr><td>Phase 2</td><td>Multi-user per company, web dashboard, Redis state</td><td>Planned</td></tr>
+        <tr><td>Phase 2</td><td>Exchange rate auto-fetch (NBE Ethiopia API)</td><td>Planned</td></tr>
+        <tr><td>Phase 2</td><td>Chapa billing integration for subscriptions</td><td>Planned</td></tr>
+        <tr><td>Phase 3</td><td>Bank statement import (Ethiopian banks)</td><td>Planned</td></tr>
+        <tr><td>Phase 3</td><td>Amharic language support</td><td>Planned</td></tr>
+        <tr><td>Phase 4</td><td>Analytics dashboard, anomaly detection</td><td>Future</td></tr>
+        <tr><td>Phase 4</td><td>API for third-party integrations</td><td>Future</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout success">
+      <strong>Key advantage:</strong> Every client onboarded today automatically becomes part of the SaaS platform when Phase 2 launches — their data is already in the right structure.
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Helias FinPilot Operator Guide · Version 1.0 · March 2026<br>
+  Internal document — Helias AI and Analytics · Do not share with clients directly
+</div>
+
+</body>
+</html>

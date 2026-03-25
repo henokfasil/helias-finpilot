@@ -1,0 +1,173 @@
+"""
+Dashboard database helpers — read-only queries returning pandas DataFrames.
+Uses the same SQLite database as the Telegram bot.
+"""
+from __future__ import annotations
+
+import sys
+import os
+from pathlib import Path
+
+# Ensure project root is on the path
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+import pandas as pd
+import streamlit as st
+from sqlalchemy import create_engine, text
+
+from app.config import settings
+
+
+def _get_database_url() -> str:
+    """
+    Prefer Streamlit Cloud secrets, fall back to .env / default.
+    On Streamlit Cloud, secrets are injected via st.secrets.
+    """
+    try:
+        return st.secrets["DATABASE_URL"]
+    except (KeyError, FileNotFoundError):
+        return settings.database_url
+
+
+@st.cache_resource
+def get_engine():
+    """Single shared engine for the dashboard (read-only)."""
+    db_url = _get_database_url()
+    return create_engine(
+        db_url,
+        connect_args={"check_same_thread": False} if "sqlite" in db_url else {},
+    )
+
+
+@st.cache_data(ttl=30)
+def load_transactions(company_id: int = 1) -> pd.DataFrame:
+    engine = get_engine()
+    sql = text("""
+        SELECT
+            t.id,
+            t.transaction_date,
+            t.transaction_type,
+            t.amount,
+            t.currency,
+            t.description,
+            t.payment_method,
+            t.status,
+            t.ai_confidence,
+            t.raw_text,
+            t.created_at,
+            c.name  AS category,
+            cp.name AS counterparty
+        FROM transactions t
+        LEFT JOIN categories    c  ON t.category_id    = c.id
+        LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
+        WHERE t.company_id = :cid
+        ORDER BY t.transaction_date DESC, t.id DESC
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    if not df.empty:
+        df["transaction_date"] = pd.to_datetime(df["transaction_date"])
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+    return df
+
+
+@st.cache_data(ttl=30)
+def load_attachments(company_id: int = 1) -> pd.DataFrame:
+    engine = get_engine()
+    sql = text("""
+        SELECT
+            a.id,
+            a.original_filename,
+            a.stored_path,
+            a.file_type,
+            a.file_size_bytes,
+            a.created_at,
+            a.transaction_id,
+            t.transaction_date,
+            t.amount,
+            t.currency,
+            cp.name AS counterparty
+        FROM attachments a
+        LEFT JOIN transactions   t  ON a.transaction_id = t.id
+        LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
+        WHERE a.company_id = :cid
+        ORDER BY a.created_at DESC
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    if not df.empty:
+        df["created_at"] = pd.to_datetime(df["created_at"])
+        df["transaction_date"] = pd.to_datetime(df["transaction_date"])
+        df["file_size_kb"] = (df["file_size_bytes"] / 1024).round(1)
+    return df
+
+
+@st.cache_data(ttl=30)
+def load_categories(company_id: int = 1) -> pd.DataFrame:
+    engine = get_engine()
+    sql = text("""
+        SELECT id, name, type, is_active
+        FROM categories
+        WHERE company_id = :cid
+        ORDER BY type, name
+    """)
+    with engine.connect() as conn:
+        return pd.read_sql(sql, conn, params={"cid": company_id})
+
+
+@st.cache_data(ttl=30)
+def load_company(company_id: int = 1) -> dict:
+    engine = get_engine()
+    sql = text("SELECT * FROM companies WHERE id = :cid LIMIT 1")
+    with engine.connect() as conn:
+        row = conn.execute(sql, {"cid": company_id}).fetchone()
+    return dict(row._mapping) if row else {}
+
+
+@st.cache_data(ttl=30)
+def load_tax_data(company_id: int = 1) -> pd.DataFrame:
+    """Load all confirmed transactions with tax fields for the Tax dashboard."""
+    engine = get_engine()
+    sql = text("""
+        SELECT
+            t.id,
+            t.transaction_date,
+            t.transaction_type,
+            t.amount,
+            t.currency,
+            t.vat_amount,
+            t.withholding_tax,
+            t.is_vat_inclusive,
+            t.is_tax_relevant,
+            t.description,
+            t.status,
+            cp.name AS counterparty
+        FROM transactions t
+        LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
+        WHERE t.company_id = :cid
+          AND t.status = 'confirmed'
+        ORDER BY t.transaction_date DESC
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    if not df.empty:
+        df["transaction_date"] = pd.to_datetime(df["transaction_date"])
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+        df["vat_amount"] = pd.to_numeric(df["vat_amount"], errors="coerce").fillna(0)
+        df["withholding_tax"] = pd.to_numeric(df["withholding_tax"], errors="coerce").fillna(0)
+    return df
+
+
+@st.cache_data(ttl=30)
+def load_reports(company_id: int = 1) -> pd.DataFrame:
+    engine = get_engine()
+    sql = text("""
+        SELECT id, report_type, period_year, period_month, content, created_at
+        FROM reports
+        WHERE company_id = :cid
+        ORDER BY period_year DESC, period_month DESC
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    return df

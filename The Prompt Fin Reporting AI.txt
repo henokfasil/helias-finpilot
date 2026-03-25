@@ -1,0 +1,332 @@
+You are a senior full-stack AI engineer, financial systems architect, and automation expert.
+
+Your task is to design and implement a production-grade MVP system called:
+
+HELIAS AI-ASSISTED FINANCIAL REPORTING SYSTEM
+
+This system will be used initially by a single company (Helias AI and Analytics), but must be architected from the beginning to evolve into a scalable SaaS product for SMEs in Ethiopia and across Africa.
+
+-------------------------------------
+1. COMPANY CONTEXT
+-------------------------------------
+- Company: Helias AI and Analytics
+- Domain: AI, analytics, consulting, digital products
+- Country context: Ethiopia
+- Reporting requirement: Annual financial reporting (June/July cycle)
+- Goal: Track transactions daily and generate structured financial reports
+
+-------------------------------------
+2. CORE IDEA
+-------------------------------------
+The system is TELEGRAM-FIRST.
+
+The user will:
+- Send transaction details via Telegram (text)
+- Optionally upload files (PDFs, receipts, screenshots, invoices)
+- Ask questions and request reports via Telegram
+
+The system will:
+- Extract structured transaction data using AI
+- Store it in a database
+- Ask clarification questions if needed
+- Maintain audit logs
+- Generate financial reports (monthly and annual)
+- Allow querying historical transactions
+
+-------------------------------------
+3. CRITICAL DESIGN PRINCIPLES
+-------------------------------------
+- Do NOT build a toy system
+- Do NOT hallucinate financial data
+- ALWAYS preserve raw input (text + files)
+- ALWAYS track confidence levels
+- ALWAYS allow human confirmation when uncertain
+- EVERY change must be audit logged
+- PRIORITIZE structure over AI gimmicks
+
+-------------------------------------
+4. FUTURE PRODUCT DIRECTION (IMPORTANT)
+-------------------------------------
+This system must NOT be hardcoded for Helias only.
+
+Design it so it can evolve into a SaaS product.
+
+Therefore:
+- Introduce a company (tenant) entity
+- All data must be linked to a company
+- Avoid hardcoding categories, currencies, or logic
+- Support future:
+  - multi-company usage
+  - multiple users per company
+  - configurable categories
+  - configurable reporting settings
+  - future billing/subscription models
+
+MVP can run as single-company, but architecture must support multi-tenancy.
+
+-------------------------------------
+5. USER INTERACTION (TELEGRAM)
+-------------------------------------
+Support the following behaviors:
+
+Examples of user messages:
+- "Paid 3,500 ETB to Ethio Telecom for internet"
+- "Received 4,000 USD from client for consulting"
+- "Bought hosting, see attached invoice"
+- "Show this month's expenses"
+- "Generate annual report for 2026"
+
+Bot commands:
+- /start
+- /help
+- /new
+- /report
+- /monthly_report
+- /annual_report
+- /transactions
+- /search
+- /pending
+- /edit
+- /delete
+- /summary
+- /export
+
+The bot must:
+- Accept messy natural language
+- Accept file uploads
+- Ask clarification questions only when necessary
+- Keep responses concise and structured
+
+-------------------------------------
+6. DATA EXTRACTION REQUIREMENTS
+-------------------------------------
+From text and/or files extract:
+
+- transaction_date
+- entry_date
+- transaction_type (income, expense, transfer, etc.)
+- amount
+- currency
+- counterparty (client/vendor)
+- description
+- category (suggested)
+- payment_method
+- reference/invoice number
+- tax relevance (if visible)
+- confidence score
+- ambiguity flags
+
+If uncertain:
+→ ask clarification via Telegram
+
+-------------------------------------
+7. FILE PROCESSING
+-------------------------------------
+Support:
+- PDFs
+- Images (JPG, PNG)
+- Screenshots
+- Receipts
+- Excel files
+
+System must:
+- Store original files
+- Extract text using OCR if needed
+- Extract key fields
+- Link file to transaction
+- Flag inconsistencies instead of guessing
+
+-------------------------------------
+8. DATABASE DESIGN
+-------------------------------------
+Use PostgreSQL (SQLite allowed for local dev).
+
+Core tables:
+- companies
+- users
+- transactions
+- attachments
+- counterparties
+- categories
+- audit_logs
+- clarification_requests
+- reports
+
+Each transaction must include:
+- raw_text
+- normalized data
+- AI confidence
+- status (draft / confirmed / needs_clarification)
+- timestamps
+- source (telegram)
+- file links
+
+-------------------------------------
+9. CATEGORY STRUCTURE (CONFIGURABLE)
+-------------------------------------
+Seed categories for Helias:
+
+Revenue:
+- Consulting
+- AI products
+- Training
+- Research
+
+Expenses:
+- Cloud/API costs
+- Software subscriptions
+- Hosting
+- Contractors
+- Salaries
+- Internet/telecom
+- Travel
+- Marketing
+- Legal/accounting
+- Equipment
+
+Do NOT hardcode — use configurable design.
+
+-------------------------------------
+10. AGENTIC AI ARCHITECTURE
+-------------------------------------
+Design separate components:
+
+1. Ingestion Agent
+2. Extraction Agent
+3. Classification Agent
+4. Validation Agent
+5. Clarification Agent
+6. Reporting Agent
+7. Audit Agent
+
+Each should have clear responsibilities.
+
+-------------------------------------
+11. REPORTING
+-------------------------------------
+System must generate:
+
+- Transaction ledger
+- Monthly summary
+- Annual report
+- Expense breakdown
+- Revenue breakdown
+- Cash flow summary
+
+Annual report must include:
+- total revenue
+- total expenses
+- net result
+- category breakdown
+- monthly trends
+- flagged issues
+- unresolved items
+- AI-generated narrative (NO hallucination)
+
+-------------------------------------
+12. TELEGRAM QUERYING
+-------------------------------------
+User should ask:
+
+- "How much did we spend on software this month?"
+- "Show payments to Ethio Telecom"
+- "Revenue in March?"
+- "Generate 2026 report"
+
+System should:
+- translate to DB query
+- return structured + AI summary
+
+-------------------------------------
+13. DUPLICATE DETECTION
+-------------------------------------
+Detect using:
+- amount
+- date
+- counterparty
+- invoice number
+- document similarity
+
+Do NOT auto-merge → ask user
+
+-------------------------------------
+14. CURRENCY HANDLING
+-------------------------------------
+- Support ETB, USD, EUR
+- Store original currency
+- Store base currency (ETB)
+- Optional exchange rate field
+
+-------------------------------------
+15. TECH STACK
+-------------------------------------
+- Python
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Telegram Bot API
+- LLM (OpenAI or equivalent)
+- OCR tools
+- Docker-ready
+
+-------------------------------------
+16. IMPLEMENTATION EXPECTATION
+-------------------------------------
+Build a REAL Phase 1 MVP.
+
+Include:
+- Working Telegram bot
+- Transaction ingestion
+- File handling
+- AI extraction
+- Database storage
+- Basic reporting
+- Clarification flow
+- Audit logging
+
+Do NOT overbuild advanced features.
+
+-------------------------------------
+17. REQUIRED OUTPUT STRUCTURE
+-------------------------------------
+Provide:
+
+1. Solution overview
+2. Architecture
+3. Folder structure
+4. Database schema
+5. SQLAlchemy models
+6. Telegram bot logic
+7. AI prompt templates
+8. Core Python modules
+9. Sample Telegram interactions
+10. Deployment instructions
+11. Future roadmap
+
+Provide actual code files, not just descriptions.
+
+-------------------------------------
+18. CODING STANDARDS
+-------------------------------------
+- Clean, modular Python
+- Type hints required
+- No monolithic files
+- Proper error handling
+- Logging included
+- Environment variables for secrets
+
+-------------------------------------
+19. FINAL REQUIREMENT
+-------------------------------------
+This system must be:
+- practical
+- deployable
+- extensible
+- audit-safe
+
+NOT:
+- theoretical
+- overcomplicated
+- AI-hyped nonsense
+
+Focus on correctness, structure, and real-world usability.
