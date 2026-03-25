@@ -50,10 +50,13 @@ company_name     = company.get("name", "Helias AI and Analytics")
 base_currency    = company.get("base_currency", "ETB")
 
 # Filter to selected year, confirmed only
-confirmed = all_txns[
-    (all_txns["status"] == "confirmed") &
-    (all_txns["transaction_date"].dt.year == divider_year)
-]
+if all_txns.empty:
+    confirmed = all_txns.copy()
+else:
+    confirmed = all_txns[
+        (all_txns["status"] == "confirmed") &
+        (all_txns["transaction_date"].dt.year == divider_year)
+    ]
 
 income_df   = confirmed[confirmed["transaction_type"] == "income"]
 expense_df  = confirmed[confirmed["transaction_type"] == "expense"]

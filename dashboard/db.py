@@ -66,9 +66,8 @@ def load_transactions(company_id: int = 1) -> pd.DataFrame:
     """)
     with engine.connect() as conn:
         df = pd.read_sql(sql, conn, params={"cid": company_id})
-    if not df.empty:
-        df["transaction_date"] = pd.to_datetime(df["transaction_date"])
-        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+    df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     return df
 
 
