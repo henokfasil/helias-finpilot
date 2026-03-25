@@ -451,23 +451,19 @@ async def cmd_tax_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         tax = transaction_service.tax_summary(db, user.company_id, year, month)
 
     period = f"{year}-{month:02d}" if month else str(year)
-    net_vat = tax["net_vat_payable"]
-    net_sign = "+" if net_vat >= 0 else ""
 
     lines = [
         f"🧾 *Ethiopian Tax Summary — {period}*",
         f"_(Confirmed transactions only)_",
         "",
-        f"*VAT (15%)*",
-        f"  Output VAT collected (income): `{tax['output_vat']:>12,.2f} {currency}`",
-        f"  Input VAT paid (expenses):     `{tax['input_vat']:>12,.2f} {currency}`",
-        f"  ─────────────────────────────────────",
-        f"  Net VAT payable to MoR:        `{net_sign}{net_vat:>11,.2f} {currency}`",
+        f"*VAT (15%) — on income only*",
+        f"  VAT on sales/income:     `{tax['vat_on_income']:>12,.2f} {currency}`",
         "",
-        f"*Withholding Tax (2%)*",
-        f"  WHT withheld from suppliers:   `{tax['wht_collected']:>12,.2f} {currency}`",
+        f"*WHT (2%) — expenses > 10,000 ETB only*",
+        f"  WHT on large expenses:   `{tax['wht_on_expenses']:>12,.2f} {currency}`",
         "",
-        f"*Total obligation to MoR:        `{tax['total_tax_obligation']:>12,.2f} {currency}`*",
+        f"  ────────────────────────────────────",
+        f"*Total to remit to MoR:   `{tax['total_tax_obligation']:>12,.2f} {currency}`*",
         "",
         "_File and pay at your local MoR branch by the 30th of the following month._",
     ]

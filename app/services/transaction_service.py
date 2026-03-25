@@ -244,15 +244,16 @@ def annual_summary(db: Session, company_id: int, year: int) -> dict:
     return {"rows": [dict(r._mapping) for r in rows]}
 
 
+WHT_THRESHOLD = Decimal("10000")  # ETB — WHT applies only above this amount
+
+
 def tax_summary(db: Session, company_id: int, year: int, month: Optional[int] = None) -> dict:
     """
     Returns Ethiopian tax obligations for a period (confirmed transactions only).
 
-    Returns:
-        output_vat      — VAT collected on income (to remit to MoR)
-        input_vat       — VAT paid on expenses (credit against output)
-        net_vat_payable — output_vat - input_vat
-        wht_collected   — withholding tax withheld from supplier payments (to remit)
+    Ethiopian law:
+    - VAT (15%): on INCOME only — businesses remit 15% of sales revenue to MoR
+    - WHT (2%):  on EXPENSE payments > 10,000 ETB only — withheld from supplier payment
     """
     q = db.query(Transaction).filter(
         Transaction.company_id == company_id,
@@ -262,25 +263,21 @@ def tax_summary(db: Session, company_id: int, year: int, month: Optional[int] = 
     if month:
         q = q.filter(extract("month", Transaction.transaction_date) == month)
 
-    output_vat = Decimal("0")
-    input_vat = Decimal("0")
-    wht_collected = Decimal("0")
+    vat_on_income = Decimal("0")
+    wht_on_expenses = Decimal("0")
 
     for tx in q.all():
-        vat = tx.vat_amount or Decimal("0")
-        wht = tx.withholding_tax or Decimal("0")
         if tx.transaction_type == "income":
-            output_vat += vat
+            vat_on_income += tx.vat_amount or Decimal("0")
         elif tx.transaction_type == "expense":
-            input_vat += vat
-            wht_collected += wht
+            # WHT only applies on expenses > 10,000 ETB
+            if (tx.amount or Decimal("0")) > WHT_THRESHOLD:
+                wht_on_expenses += tx.withholding_tax or Decimal("0")
 
     return {
-        "output_vat": float(output_vat),
-        "input_vat": float(input_vat),
-        "net_vat_payable": float(output_vat - input_vat),
-        "wht_collected": float(wht_collected),
-        "total_tax_obligation": float(max(output_vat - input_vat, Decimal("0")) + wht_collected),
+        "vat_on_income": float(vat_on_income),
+        "wht_on_expenses": float(wht_on_expenses),
+        "total_tax_obligation": float(vat_on_income + wht_on_expenses),
     }
 
 

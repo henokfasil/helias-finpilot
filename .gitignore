@@ -1,6 +1,7 @@
 # ── Secrets & credentials ─────────────────────────────────────────────────────
 .env
 KEYS.txt
+FINPILOT_CREDENTIALS.txt
 *.pem
 *.key
 

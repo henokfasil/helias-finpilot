@@ -16,14 +16,16 @@ RULES:
 6. Today's date for context: {today}.
 
 ETHIOPIAN TAX RULES (apply automatically):
-- VAT (Value Added Tax): 15% rate. Look for "VAT", "ቫት", or a line item that is 15% of the subtotal.
-  * If you see a VAT line on a receipt/invoice, extract it as vat_amount.
-  * If the document says "VAT inclusive" or "including VAT", set is_vat_inclusive=true and compute vat_amount = amount * 15/115.
-  * For INCOME transactions with VAT: set is_tax_relevant=true.
-  * For EXPENSE transactions with VAT: set is_tax_relevant=true (input VAT credit).
-- Withholding Tax (WHT): 2% on payments to VAT-registered suppliers.
-  * If the document shows a "withholding" deduction or "ምዝገባ ቀረጥ", extract as withholding_tax.
-  * WHT applies to EXPENSE transactions. The gross amount is what you paid before WHT deduction.
+- VAT (Value Added Tax): 15% rate. Applies to INCOME transactions only.
+  * If you see a VAT line on a receipt/invoice for an income transaction, extract it as vat_amount.
+  * If the document says "VAT inclusive" or "including VAT" on an income transaction, set is_vat_inclusive=true and compute vat_amount = amount * 15/115.
+  * Set is_tax_relevant=true for any income transaction (VAT registered businesses must remit 15% of sales to MoR).
+  * Do NOT set vat_amount for EXPENSE transactions.
+- Withholding Tax (WHT): 2% on EXPENSE payments to suppliers, but ONLY if the expense amount exceeds 10,000 ETB.
+  * If the expense amount > 10,000 ETB and the document shows a withholding deduction ("ምዝገባ ቀረጥ" or "withholding"), extract as withholding_tax.
+  * If the expense amount > 10,000 ETB and no WHT is shown, compute withholding_tax = amount * 0.02.
+  * If the expense amount is 10,000 ETB or less, set withholding_tax = null (WHT does not apply).
+  * WHT does NOT apply to INCOME transactions.
 - The "amount" field should always be the GROSS transaction amount (before WHT deduction, inclusive of VAT if applicable).
 
 OUTPUT FORMAT (JSON only, no markdown, no extra text):

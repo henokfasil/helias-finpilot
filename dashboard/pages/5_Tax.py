@@ -1,5 +1,5 @@
 """
-Tax Compliance page — Ethiopian VAT (15%) and Withholding Tax (2%) dashboard.
+Tax Compliance page — Ethiopian VAT (15% on income) and WHT (2% on expenses > 10,000 ETB).
 """
 from __future__ import annotations
 import sys
@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from datetime import date
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 
 from dashboard.db import load_tax_data, load_company
@@ -19,11 +18,13 @@ st.set_page_config(page_title="Tax · FinPilot", page_icon="🧾", layout="wide"
 
 company = load_company()
 currency = company.get("base_currency", "ETB") if company else "ETB"
-page_header("Tax Compliance", "Ethiopian VAT (15%) & Withholding Tax (2%) — MoR Filing Overview")
+page_header("Tax Compliance", "Ethiopian VAT (15%) on Income · WHT (2%) on Expenses > 10,000 ETB")
 
 df = load_tax_data()
 
-# ── Period selector ────────────────────────────────────────────────────────────
+WHT_THRESHOLD = 10_000  # ETB
+
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### Period")
     available_years = sorted(
@@ -35,218 +36,178 @@ with st.sidebar:
                  5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep",
                  10: "Oct", 11: "Nov", 12: "Dec"}
     sel_month = st.selectbox("Month", list(month_map.keys()), format_func=lambda m: month_map[m])
+
     st.markdown("---")
-    st.markdown("### Tax Estimation Mode")
-    auto_estimate = st.toggle(
-        "Auto-estimate from amounts",
-        value=True,
-        help=(
-            "ON: Calculate VAT (15%) and WHT (2%) from transaction amounts "
-            "when not explicitly recorded on a receipt.\n\n"
-            "OFF: Show only VAT/WHT values extracted directly from invoices."
-        ),
-    )
+    auto_estimate = st.toggle("Auto-estimate where not on invoice", value=True,
+        help="If VAT/WHT not explicitly on a receipt, estimate from the transaction amount.")
+
     st.markdown("---")
     st.info(
-        "**Ethiopian Tax Rates**\n\n"
-        "- VAT: **15%** (threshold: ETB 1M/yr)\n"
-        "- WHT: **2%** on supplier payments\n"
-        "- Filing deadline: **30th** of following month"
+        "**Ethiopian Tax Law**\n\n"
+        "- **VAT 15%** — on income/sales only\n"
+        "- **WHT 2%** — on expense payments **> 10,000 ETB** only\n"
+        "- Filing deadline: **30th** of following month\n"
+        "- VAT registration threshold: **ETB 1,000,000/yr**"
     )
-    if auto_estimate:
-        st.caption(
-            "Estimation assumes your income amounts are **VAT-exclusive** "
-            "(i.e. VAT = amount × 15%) and all expenses have 2% WHT applied."
-        )
 
-# Filter data
-fdf = df[df["transaction_date"].dt.year == sel_year].copy()
-if sel_month != 0:
+# ── Filter data ────────────────────────────────────────────────────────────────
+fdf = df[df["transaction_date"].dt.year == sel_year].copy() if not df.empty else df.copy()
+if sel_month != 0 and not fdf.empty:
     fdf = fdf[fdf["transaction_date"].dt.month == sel_month]
-
 period_label = f"{sel_year}-{sel_month:02d}" if sel_month != 0 else str(sel_year)
 
-# ── Tax calculations ───────────────────────────────────────────────────────────
 income_df  = fdf[fdf["transaction_type"] == "income"].copy()
 expense_df = fdf[fdf["transaction_type"] == "expense"].copy()
 
+# ── VAT: income only ──────────────────────────────────────────────────────────
 if auto_estimate:
-    # Where VAT not explicitly recorded, estimate it from the amount
-    income_df["vat_used"]  = income_df.apply(
+    income_df["vat_used"] = income_df.apply(
         lambda r: r["vat_amount"] if r["vat_amount"] > 0 else r["amount"] * 0.15, axis=1
     )
-    expense_df["vat_used"] = expense_df.apply(
-        lambda r: r["vat_amount"] if r["vat_amount"] > 0 else r["amount"] * 0.15, axis=1
-    )
-    expense_df["wht_used"] = expense_df.apply(
+else:
+    income_df["vat_used"] = income_df["vat_amount"]
+
+# ── WHT: expenses > 10,000 ETB only ──────────────────────────────────────────
+eligible_expense = expense_df[expense_df["amount"] > WHT_THRESHOLD].copy()
+if auto_estimate:
+    eligible_expense["wht_used"] = eligible_expense.apply(
         lambda r: r["withholding_tax"] if r["withholding_tax"] > 0 else r["amount"] * 0.02, axis=1
     )
 else:
-    income_df["vat_used"]  = income_df["vat_amount"]
-    expense_df["vat_used"] = expense_df["vat_amount"]
-    expense_df["wht_used"] = expense_df["withholding_tax"]
+    eligible_expense["wht_used"] = eligible_expense["withholding_tax"]
 
-output_vat   = income_df["vat_used"].sum()
-input_vat    = expense_df["vat_used"].sum()
-net_vat      = output_vat - input_vat
-wht_total    = expense_df["wht_used"].sum()
-total_oblig  = max(net_vat, 0) + wht_total
+vat_total  = income_df["vat_used"].sum() if not income_df.empty else 0
+wht_total  = eligible_expense["wht_used"].sum() if not eligible_expense.empty else 0
+total_oblig = vat_total + wht_total
 
-estimated_badge = " _(estimated)_" if auto_estimate else ""
-
-# ── KPI strip ─────────────────────────────────────────────────────────────────
+# ── Info banner ────────────────────────────────────────────────────────────────
 if auto_estimate:
-    st.info("💡 **Estimation mode ON** — VAT and WHT are calculated automatically from transaction amounts. Toggle off in the sidebar to show only explicitly-recorded values.")
+    st.info("💡 **Estimation ON** — VAT computed as 15% of income; WHT as 2% of expenses > 10,000 ETB where not explicitly on invoice.")
 
-k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric(f"Output VAT{estimated_badge}", f"{output_vat:,.2f} {currency}", help="VAT you collected on income — must remit to MoR")
-k2.metric(f"Input VAT{estimated_badge}", f"{input_vat:,.2f} {currency}", help="VAT you paid on purchases — deductible credit")
-delta_color = "inverse" if net_vat > 0 else "normal"
-k3.metric("Net VAT Payable", f"{net_vat:,.2f} {currency}",
-          delta=f"{'+' if net_vat >= 0 else ''}{net_vat:,.2f}", delta_color=delta_color,
-          help="Output VAT − Input VAT = amount to pay MoR")
-k4.metric(f"WHT Collected (2%){estimated_badge}", f"{wht_total:,.2f} {currency}", help="Withholding tax withheld from supplier payments")
-k5.metric("Total MoR Obligation", f"{total_oblig:,.2f} {currency}", help="Net VAT payable + WHT to remit")
+# ── KPI strip ──────────────────────────────────────────────────────────────────
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("VAT on Income (15%)", f"{vat_total:,.2f} {currency}",
+          help="15% of your sales revenue — remit to MoR")
+k2.metric("WHT on Expenses (2%)", f"{wht_total:,.2f} {currency}",
+          help="2% withheld from supplier payments > 10,000 ETB")
+k3.metric("Expenses below WHT threshold", f"{len(expense_df) - len(eligible_expense)}",
+          help=f"Expense transactions ≤ {WHT_THRESHOLD:,} ETB — WHT does not apply")
+k4.metric("Total MoR Obligation", f"{total_oblig:,.2f} {currency}",
+          help="VAT on income + WHT on large expenses")
 
 divider()
 
-# ── Two-column layout ─────────────────────────────────────────────────────────
+# ── Charts ─────────────────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 
-# ── VAT breakdown chart ───────────────────────────────────────────────────────
 with col1:
-    st.markdown("#### VAT Breakdown")
-    vat_fig = go.Figure(go.Bar(
-        x=["Output VAT\n(collected on income)", "Input VAT\n(paid on expenses)", "Net VAT Payable"],
-        y=[output_vat, input_vat, max(net_vat, 0)],
-        marker_color=["#2ecc71", "#e74c3c", "#e94560"],
-        text=[f"{v:,.2f}" for v in [output_vat, input_vat, max(net_vat, 0)]],
+    st.markdown("#### Tax Obligation Breakdown")
+    fig = go.Figure(go.Bar(
+        x=["VAT on Income (15%)", f"WHT on Expenses >10k (2%)"],
+        y=[vat_total, wht_total],
+        marker_color=["#e94560", "#3498db"],
+        text=[f"{vat_total:,.0f}", f"{wht_total:,.0f}"],
         textposition="outside",
     ))
-    vat_fig.update_layout(
-        yaxis_title=f"Amount ({currency})",
-        showlegend=False,
-        height=320,
-        margin=dict(t=20, b=20),
-    )
-    st.plotly_chart(vat_fig, use_container_width=True)
+    fig.update_layout(yaxis_title=f"Amount ({currency})", height=300,
+                      margin=dict(t=20, b=20), showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-# ── Monthly VAT trend (only for full year) ────────────────────────────────────
 with col2:
     if sel_month == 0 and not fdf.empty:
-        st.markdown("#### Monthly VAT Trend")
-        monthly = fdf.copy()
-        monthly["month"] = monthly["transaction_date"].dt.month
-        out_m = monthly[monthly["transaction_type"] == "income"].groupby("month")["vat_amount"].sum()
-        inp_m = monthly[monthly["transaction_type"] == "expense"].groupby("month")["vat_amount"].sum()
-
-        months = list(range(1, 13))
+        st.markdown("#### Monthly VAT on Income")
+        income_df["month"] = income_df["transaction_date"].dt.month
+        monthly_vat = income_df.groupby("month")["vat_used"].sum()
         month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-        trend_fig = go.Figure()
-        trend_fig.add_trace(go.Bar(name="Output VAT", x=month_labels,
-                                   y=[out_m.get(m, 0) for m in months], marker_color="#2ecc71"))
-        trend_fig.add_trace(go.Bar(name="Input VAT", x=month_labels,
-                                   y=[inp_m.get(m, 0) for m in months], marker_color="#e74c3c"))
-        trend_fig.update_layout(barmode="group", height=320,
-                                 yaxis_title=f"VAT Amount ({currency})",
-                                 margin=dict(t=20, b=20))
-        st.plotly_chart(trend_fig, use_container_width=True)
+        fig2 = go.Figure(go.Bar(
+            x=month_labels,
+            y=[monthly_vat.get(m, 0) for m in range(1, 13)],
+            marker_color="#e94560",
+        ))
+        fig2.update_layout(yaxis_title=f"VAT ({currency})", height=300, margin=dict(t=20, b=20))
+        st.plotly_chart(fig2, use_container_width=True)
     else:
-        st.markdown("#### Tax Obligation Summary")
-        pie_fig = px.pie(
-            names=["Net VAT Payable", "WHT to Remit"],
-            values=[max(net_vat, 0), wht_total],
-            color_discrete_sequence=["#e94560", "#3498db"],
-            hole=0.5,
-        )
-        pie_fig.update_traces(textinfo="label+value+percent")
-        pie_fig.update_layout(height=320, margin=dict(t=20, b=20))
-        st.plotly_chart(pie_fig, use_container_width=True)
+        st.markdown("#### Tax Rule Summary")
+        st.markdown(f"""
+        | Transaction | VAT (15%) | WHT (2%) |
+        |---|---|---|
+        | **Income** | ✅ Applies — remit to MoR | ❌ Does not apply |
+        | **Expense ≤ 10,000 ETB** | ❌ Does not apply | ❌ Does not apply |
+        | **Expense > 10,000 ETB** | ❌ Does not apply | ✅ Withhold from supplier |
+        """)
 
 divider()
 
-# ── VAT transaction table ─────────────────────────────────────────────────────
-vat_label = "Transactions with VAT" + (" (estimated where not on invoice)" if auto_estimate else "")
-st.markdown(f"#### {vat_label}")
-
-all_tax_txns = pd.concat([income_df, expense_df], ignore_index=True)
-all_tax_txns = all_tax_txns[all_tax_txns["vat_used"] > 0].copy()
-
-if all_tax_txns.empty:
-    st.info("No VAT transactions for this period.")
+# ── VAT table (income only) ────────────────────────────────────────────────────
+st.markdown("#### Income Transactions — VAT (15%)")
+if income_df.empty:
+    st.info("No income transactions for this period.")
 else:
-    all_tax_txns["date"] = all_tax_txns["transaction_date"].dt.strftime("%Y-%m-%d")
-    all_tax_txns["vat_type"] = all_tax_txns["transaction_type"].map(
-        {"income": "Output (collect)", "expense": "Input (credit)"}
-    ).fillna("—")
-    all_tax_txns["source"] = all_tax_txns["vat_amount"].apply(
-        lambda v: "From invoice" if v > 0 else "Estimated (15%)"
-    )
-    disp_cols = ["date", "transaction_type", "vat_type", "amount", "vat_used", "currency", "counterparty", "description"]
+    disp = income_df.copy()
+    disp["date"] = disp["transaction_date"].dt.strftime("%Y-%m-%d")
+    disp["source"] = disp["vat_amount"].apply(lambda v: "From invoice" if v > 0 else "Estimated")
+    cols = ["date", "amount", "vat_used", "currency", "counterparty", "description"]
     if auto_estimate:
-        disp_cols.insert(5, "source")
+        cols.insert(3, "source")
     st.dataframe(
-        all_tax_txns[disp_cols].rename(columns={
-            "date": "Date", "transaction_type": "Type", "vat_type": "VAT Type",
-            "amount": f"Gross ({currency})", "vat_used": f"VAT ({currency})",
-            "source": "Source", "currency": "Curr",
-            "counterparty": "Counterparty", "description": "Description",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-divider()
-
-# ── WHT transaction table ─────────────────────────────────────────────────────
-wht_label = "Transactions with Withholding Tax (2%)" + (" (estimated where not on invoice)" if auto_estimate else "")
-st.markdown(f"#### {wht_label}")
-wht_txns = expense_df[expense_df["wht_used"] > 0].copy()
-if wht_txns.empty:
-    st.info("No WHT transactions for this period.")
-else:
-    wht_txns["date"] = wht_txns["transaction_date"].dt.strftime("%Y-%m-%d")
-    wht_txns["net_paid"] = wht_txns["amount"] - wht_txns["wht_used"]
-    wht_txns["wht_source"] = wht_txns["withholding_tax"].apply(
-        lambda v: "From invoice" if v > 0 else "Estimated (2%)"
-    )
-    disp_cols = ["date", "amount", "wht_used", "net_paid", "currency", "counterparty", "description"]
-    if auto_estimate:
-        disp_cols.insert(3, "wht_source")
-    st.dataframe(
-        wht_txns[disp_cols].rename(columns={
+        disp[cols].rename(columns={
             "date": "Date", "amount": f"Gross ({currency})",
-            "wht_used": f"WHT Withheld ({currency})", "wht_source": "Source",
+            "vat_used": f"VAT 15% ({currency})", "source": "Source",
+            "currency": "Curr", "counterparty": "Counterparty", "description": "Description",
+        }),
+        use_container_width=True, hide_index=True,
+    )
+
+divider()
+
+# ── WHT table (expenses > 10,000 ETB only) ────────────────────────────────────
+st.markdown(f"#### Expense Transactions — WHT (2%) — Only amounts > {WHT_THRESHOLD:,} ETB")
+if eligible_expense.empty:
+    st.success(f"✅ No expense transactions above {WHT_THRESHOLD:,} ETB — WHT does not apply.")
+else:
+    disp2 = eligible_expense.copy()
+    disp2["date"] = disp2["transaction_date"].dt.strftime("%Y-%m-%d")
+    disp2["net_paid"] = disp2["amount"] - disp2["wht_used"]
+    disp2["source"] = disp2["withholding_tax"].apply(lambda v: "From invoice" if v > 0 else "Estimated")
+    cols2 = ["date", "amount", "wht_used", "net_paid", "currency", "counterparty", "description"]
+    if auto_estimate:
+        cols2.insert(3, "source")
+    st.dataframe(
+        disp2[cols2].rename(columns={
+            "date": "Date", "amount": f"Gross ({currency})",
+            "wht_used": f"WHT 2% ({currency})", "source": "Source",
             "net_paid": f"Net Paid ({currency})", "currency": "Curr",
             "counterparty": "Supplier", "description": "Description",
         }),
-        use_container_width=True,
-        hide_index=True,
+        use_container_width=True, hide_index=True,
     )
+
+if not expense_df[expense_df["amount"] <= WHT_THRESHOLD].empty:
+    skipped = expense_df[expense_df["amount"] <= WHT_THRESHOLD]
+    st.caption(f"ℹ️ {len(skipped)} expense transaction(s) ≤ {WHT_THRESHOLD:,} ETB excluded — WHT does not apply.")
 
 divider()
 
-# ── Filing reminder ───────────────────────────────────────────────────────────
-st.markdown("#### MoR Filing Checklist")
+# ── Filing checklist ───────────────────────────────────────────────────────────
+st.markdown("#### MoR Filing Summary")
 c1, c2 = st.columns(2)
 with c1:
-    est_note = " _(est.)_" if auto_estimate else ""
+    est = " _(est.)_" if auto_estimate else ""
     st.markdown(f"""
-    | Obligation | Amount ({currency}){est_note} | Due Date |
+    | Obligation | Amount ({currency}){est} | Due |
     |---|---|---|
-    | Net VAT Payable | **{max(net_vat, 0):,.2f}** | 30th of next month |
-    | Withholding Tax | **{wht_total:,.2f}** | 30th of next month |
-    | **Total** | **{total_oblig:,.2f}** | |
+    | VAT on income | **{vat_total:,.2f}** | 30th next month |
+    | WHT on large expenses | **{wht_total:,.2f}** | 30th next month |
+    | **Total to MoR** | **{total_oblig:,.2f}** | |
     """)
 with c2:
     if total_oblig > 0:
         st.warning(
-            f"⚠️ **{total_oblig:,.2f} {currency}** is due to the Ministry of Revenue "
-            f"for **{period_label}**.\n\n"
-            "Remember to bring:\n"
-            "- VAT declaration form\n"
-            "- Withholding tax schedule\n"
-            "- Supporting invoices/receipts"
+            f"⚠️ **{total_oblig:,.2f} {currency}** due to MoR for **{period_label}**.\n\n"
+            "Bring to your MoR branch:\n"
+            "- VAT declaration form (for income VAT)\n"
+            "- Withholding tax schedule (for WHT)\n"
+            "- Supporting invoices"
         )
     else:
-        st.success(f"✅ No tax obligation recorded for {period_label}.")
+        st.success(f"✅ No tax obligation for {period_label}.")
