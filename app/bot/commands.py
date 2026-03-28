@@ -377,45 +377,75 @@ async def cmd_export_receipts(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
 
 async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    /delete <id>  — marks a transaction as rejected (soft delete).
-    Usage: /delete 42
+    /delete <id>          — delete one transaction
+    /delete 1 2 3         — delete multiple transactions
+    /delete 1-5           — delete a range
     """
     if not update.effective_user or not update.message:
         return
     if not ctx.args:
         await update.message.reply_text(
-            "Usage: `/delete <transaction_id>`\n\nFind the ID with /transactions",
+            "Usage:\n"
+            "  `/delete 5` — delete one\n"
+            "  `/delete 1 2 3` — delete multiple\n"
+            "  `/delete 1-5` — delete a range\n\n"
+            "Find IDs with /transactions",
             parse_mode="Markdown",
         )
         return
-    try:
-        tx_id = int(ctx.args[0])
-    except ValueError:
-        await update.message.reply_text("Please provide a numeric transaction ID.")
-        return
+
+    # Parse IDs — support: "1 2 3" or "1-5" or mix
+    ids_to_delete: list[int] = []
+    for arg in ctx.args:
+        if "-" in arg:
+            try:
+                start, end = arg.split("-")
+                ids_to_delete.extend(range(int(start), int(end) + 1))
+            except ValueError:
+                await update.message.reply_text(f"Invalid range: `{arg}`. Use format: 1-5", parse_mode="Markdown")
+                return
+        else:
+            try:
+                ids_to_delete.append(int(arg))
+            except ValueError:
+                await update.message.reply_text(f"Invalid ID: `{arg}`. Must be a number.", parse_mode="Markdown")
+                return
+
+    ids_to_delete = list(set(ids_to_delete))  # deduplicate
+
+    deleted, not_found, already_deleted = [], [], []
 
     with get_db_context() as db:
         user = _get_user(db, update.effective_user.id)
         if not user:
             await update.message.reply_text("Please /start first.")
             return
-        tx = db.query(Transaction).filter(
-            Transaction.id == tx_id,
-            Transaction.company_id == user.company_id,
-        ).first()
-        if not tx:
-            await update.message.reply_text(f"Transaction #{tx_id} not found.")
-            return
-        if tx.status == "rejected":
-            await update.message.reply_text(f"Transaction #{tx_id} is already deleted.")
-            return
-        transaction_service.reject_transaction(db, tx, update.effective_user.id, reason="deleted by user")
+        for tx_id in ids_to_delete:
+            tx = db.query(Transaction).filter(
+                Transaction.id == tx_id,
+                Transaction.company_id == user.company_id,
+            ).first()
+            if not tx:
+                not_found.append(tx_id)
+            elif tx.status == "rejected":
+                already_deleted.append(tx_id)
+            else:
+                transaction_service.reject_transaction(db, tx, update.effective_user.id, reason="deleted by user")
+                deleted.append(tx_id)
 
-    await update.message.reply_text(
-        f"🗑 Transaction *#{tx_id}* has been deleted.\n"
-        f"_(It remains in the audit log for compliance.)_",
-        parse_mode="Markdown",
-    )
+    lines = []
+    if deleted:
+        ids_str = ", ".join(f"#{i}" for i in deleted)
+        lines.append(f"🗑 Deleted: *{ids_str}*")
+    if already_deleted:
+        ids_str = ", ".join(f"#{i}" for i in already_deleted)
+        lines.append(f"⚠️ Already deleted: {ids_str}")
+    if not_found:
+        ids_str = ", ".join(f"#{i}" for i in not_found)
+        lines.append(f"❌ Not found: {ids_str}")
+    lines.append("_(Deleted transactions remain in audit log for compliance.)_")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_tax_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

@@ -1,0 +1,9 @@
+There are a few comments on this product. 
+
+The first comment, For example, if I want to delete transactions now, I can do only one transaction, a single one, but you know, so I ask you to give me the chance to delete multiple transactions.  
+
+The second one, this is basically financial reporting that contain run and expense and the tax compliance, but at the end of the day, since this is going to be a thin pilot, I think we need to add financial statement, balance sheet, and cash flow so that this is going to be a full-fledged financial reporting product for a company that could be sellable. The third point, as you can see, the app is in web form. Since we are doing this in Ethiopia, I am thinking to integrate this with a telecloud so that we have an app under the telecloud of Ethiotelecom and customers can pay their and can use the app straight from the telecloud and we can give them credentials as well. What do you think?
+
+The third, sometimes when you upload screenshot of receipts, it incorrectly labeled a payment which is an expense as income. So let's build something to solve this problem. 
+
+Forth, for instance, if I get 15 customers as same time, how could I handle the cloud infrastructure along with Claude, streamlit and all. How is the scaling look like?

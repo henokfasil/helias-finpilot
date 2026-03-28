@@ -57,6 +57,8 @@ def format_extraction_preview(ex: ExtractedTransaction) -> str:
         "  ✅ *yes* — save it",
         "  ❌ *no* — discard it",
         "  ✏️ *edit* — correct a field",
+        "  💰 *income* — mark as income",
+        "  💸 *expense* — mark as expense",
     ]
     return "\n".join(lines)
 

@@ -201,7 +201,7 @@ async def handle_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 
 def _is_confirmation(text: str) -> bool:
     lower = text.lower().strip()
-    return lower in ("yes", "y", "no", "n", "edit", "✅", "❌", "✏️", "confirm", "discard")
+    return lower in ("yes", "y", "no", "n", "edit", "✅", "❌", "✏️", "confirm", "discard", "income", "expense", "💰", "💸")
 
 
 async def _handle_confirmation(
@@ -286,6 +286,28 @@ async def _handle_confirmation(
     elif lower in ("no", "n", "❌", "discard"):
         bot_state.clear_pending(chat_id)
         await update.message.reply_text("❌ Transaction discarded.")  # type: ignore[union-attr]
+
+    elif lower in ("income", "💰"):
+        pending.extracted.transaction_type = "income"
+        pending.clarification_field = None
+        bot_state.set_pending(chat_id, pending)
+        from app.bot.utils import format_extraction_preview
+        preview = format_extraction_preview(pending.extracted)
+        await update.message.reply_text(  # type: ignore[union-attr]
+            f"💰 Marked as *income*. Updated preview:\n\n{preview}",
+            parse_mode="Markdown",
+        )
+
+    elif lower in ("expense", "💸"):
+        pending.extracted.transaction_type = "expense"
+        pending.clarification_field = None
+        bot_state.set_pending(chat_id, pending)
+        from app.bot.utils import format_extraction_preview
+        preview = format_extraction_preview(pending.extracted)
+        await update.message.reply_text(  # type: ignore[union-attr]
+            f"💸 Marked as *expense*. Updated preview:\n\n{preview}",
+            parse_mode="Markdown",
+        )
 
     elif lower == "edit":
         await update.message.reply_text(  # type: ignore[union-attr]
