@@ -159,6 +159,66 @@ def load_tax_data(company_id: int = 1) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=30)
+def load_financial_data(company_id: int = 1) -> pd.DataFrame:
+    """
+    Load all confirmed transactions with activity_type for financial statements.
+    Includes category name and counterparty name.
+    """
+    engine = get_engine()
+    sql = text("""
+        SELECT
+            t.id,
+            t.transaction_date,
+            t.transaction_type,
+            t.activity_type,
+            t.amount,
+            t.currency,
+            t.description,
+            t.payment_method,
+            t.vat_amount,
+            t.withholding_tax,
+            t.is_vat_inclusive,
+            t.status,
+            c.name  AS category,
+            cp.name AS counterparty
+        FROM transactions t
+        LEFT JOIN categories     c  ON t.category_id     = c.id
+        LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
+        WHERE t.company_id = :cid
+          AND t.status = 'confirmed'
+        ORDER BY t.transaction_date ASC, t.id ASC
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+    df["vat_amount"] = pd.to_numeric(df["vat_amount"], errors="coerce").fillna(0)
+    df["withholding_tax"] = pd.to_numeric(df["withholding_tax"], errors="coerce").fillna(0)
+    df["activity_type"] = df["activity_type"].fillna("operating")
+    return df
+
+
+@st.cache_data(ttl=30)
+def load_account_snapshots(company_id: int = 1) -> pd.DataFrame:
+    """Load manually-entered Balance Sheet items (AccountSnapshot)."""
+    engine = get_engine()
+    sql = text("""
+        SELECT id, account_name, account_type, account_subtype,
+               amount, currency, entry_date, notes, is_active
+        FROM account_snapshots
+        WHERE company_id = :cid
+          AND is_active = true
+        ORDER BY account_type, account_name
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cid": company_id})
+    if not df.empty:
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+        df["entry_date"] = pd.to_datetime(df["entry_date"], errors="coerce")
+    return df
+
+
+@st.cache_data(ttl=30)
 def load_reports(company_id: int = 1) -> pd.DataFrame:
     engine = get_engine()
     sql = text("""

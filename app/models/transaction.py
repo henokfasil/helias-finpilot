@@ -36,6 +36,10 @@ class Transaction(Base, TimestampMixin):
     reference_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_tax_relevant: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # ── Cash Flow classification ──────────────────────────────────────────────
+    # operating (default) | investing | financing
+    activity_type: Mapped[str] = mapped_column(String(20), default="operating")
+
     # ── Ethiopian tax fields ──────────────────────────────────────────────────
     vat_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
     withholding_tax: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)

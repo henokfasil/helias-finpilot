@@ -8,6 +8,7 @@ from app.models.attachment import Attachment
 from app.models.audit_log import AuditLog
 from app.models.clarification import ClarificationRequest
 from app.models.report import Report
+from app.models.account_snapshot import AccountSnapshot
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "AuditLog",
     "ClarificationRequest",
     "Report",
+    "AccountSnapshot",
 ]

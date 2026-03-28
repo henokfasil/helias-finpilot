@@ -15,7 +15,7 @@ from app.database import get_db_context
 from app.models.company import Company
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.services import report_service, transaction_service
+from app.services import report_service, transaction_service, financial_statements
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,6 @@ Just send a message like:
 *Commands:*
 /start — register and get started
 /help — show this help
-/new — start a new transaction entry
 /transactions — list recent transactions
 /pending — show unconfirmed items
 /summary — quick financial snapshot
@@ -39,6 +38,9 @@ Just send a message like:
 /annual\_report — full year report
 /report YYYY-MM — report for specific month
 /tax\_summary — Ethiopian VAT & WHT obligations
+/income\_statement — Profit & Loss statement
+/balance\_sheet — Assets, Liabilities & Equity
+/cashflow — Cash Flow statement
 /search keyword — search transactions
 /export — export transaction data
 """
@@ -499,6 +501,194 @@ async def cmd_tax_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     ]
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+# ── Financial Statements ──────────────────────────────────────────────────────
+
+async def cmd_income_statement(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /income_statement         — current year P&L
+    /income_statement YYYY    — specific year
+    /income_statement YYYY-MM — specific month
+    """
+    if not update.effective_user or not update.message:
+        return
+    today = date.today()
+    year, month = today.year, None
+
+    if ctx.args:
+        try:
+            parts = ctx.args[0].split("-")
+            year = int(parts[0])
+            month = int(parts[1]) if len(parts) > 1 else None
+        except Exception:
+            await update.message.reply_text("Usage: /income_statement, /income_statement YYYY, or /income_statement YYYY-MM")
+            return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        company = db.get(Company, user.company_id)
+        currency = company.base_currency if company else "ETB"
+        stmt = financial_statements.income_statement(db, user.company_id, year, month)
+
+    period = f"{year}-{month:02d}" if month else str(year)
+    margin = (stmt["net_profit"] / stmt["revenue"] * 100) if stmt["revenue"] > 0 else 0
+
+    lines = [
+        f"📊 *Income Statement — {period}*",
+        f"_(Confirmed transactions only)_",
+        "",
+        f"*REVENUE*",
+        f"  Sales / Service Income:   `{stmt['revenue']:>12,.2f} {currency}`",
+        "",
+        f"*OPERATING EXPENSES*",
+    ]
+    for item in stmt["expenses_detail"][:8]:
+        lines.append(f"  {item['category'][:20]:<20} `{item['amount']:>10,.2f}`")
+    lines += [
+        f"  {'TOTAL EXPENSES':<20} `{stmt['expenses']:>10,.2f} {currency}`",
+        "",
+        f"  ────────────────────────────────────",
+        f"*GROSS PROFIT:  `{stmt['gross_profit']:>11,.2f} {currency}`*",
+        "",
+        f"*TAX OBLIGATIONS (separate — remit to MoR)*",
+        f"  VAT Payable (15%):   `{stmt['vat_on_income']:>12,.2f} {currency}`",
+        f"  WHT Payable (2%):    `{stmt['wht_on_expenses']:>12,.2f} {currency}`",
+        "",
+        f"  ────────────────────────────────────",
+        f"*NET PROFIT:    `{stmt['net_profit']:>11,.2f} {currency}`*",
+        f"  Margin: `{margin:.1f}%`",
+    ]
+
+    await _send_long(update, "\n".join(lines))
+
+
+async def cmd_balance_sheet(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /balance_sheet            — as of today
+    /balance_sheet YYYY-MM-DD — as of specific date
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    as_of = date.today()
+    if ctx.args:
+        try:
+            as_of = date.fromisoformat(ctx.args[0])
+        except Exception:
+            await update.message.reply_text("Usage: /balance_sheet or /balance_sheet YYYY-MM-DD")
+            return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        company = db.get(Company, user.company_id)
+        currency = company.base_currency if company else "ETB"
+        bs = financial_statements.balance_sheet(db, user.company_id, as_of)
+
+    balance_icon = "✅" if bs["balanced"] else "⚠️"
+    lines = [
+        f"⚖️ *Balance Sheet — {as_of}* {balance_icon}",
+        f"_(Confirmed transactions up to this date)_",
+        "",
+        f"*ASSETS*",
+        f"  Cash & Bank:   `{bs['assets']['computed_cash']:>12,.2f} {currency}`",
+    ]
+    for item in bs["assets"]["manual_items"]:
+        lines.append(f"  {item['name'][:22]:<22} `{item['amount']:>8,.2f}`")
+    lines += [
+        f"  {'TOTAL ASSETS':<22} `{bs['assets']['total']:>8,.2f} {currency}`",
+        "",
+        f"*LIABILITIES*",
+        f"  VAT Payable (15%): `{bs['liabilities']['vat_payable']:>10,.2f} {currency}`",
+        f"  WHT Payable (2%):  `{bs['liabilities']['wht_payable']:>10,.2f} {currency}`",
+    ]
+    for item in bs["liabilities"]["manual_items"]:
+        lines.append(f"  {item['name'][:22]:<22} `{item['amount']:>8,.2f}`")
+    lines += [
+        f"  {'TOTAL LIABILITIES':<22} `{bs['liabilities']['total']:>8,.2f} {currency}`",
+        "",
+        f"*EQUITY*",
+        f"  Retained Earnings: `{bs['equity']['retained_earnings']:>10,.2f} {currency}`",
+    ]
+    for item in bs["equity"]["manual_items"]:
+        lines.append(f"  {item['name'][:22]:<22} `{item['amount']:>8,.2f}`")
+    lines += [
+        f"  {'TOTAL EQUITY':<22} `{bs['equity']['total']:>8,.2f} {currency}`",
+        "",
+        f"  ────────────────────────────────────",
+        f"  L + E:              `{bs['total_liabilities_and_equity']:>8,.2f} {currency}`",
+    ]
+    if not bs["balanced"]:
+        diff = bs["assets"]["total"] - bs["total_liabilities_and_equity"]
+        lines.append(f"\n⚠️ Difference: `{diff:+,.2f}` — add capital/assets in account\\_snapshots table.")
+
+    await _send_long(update, "\n".join(lines))
+
+
+async def cmd_cashflow(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /cashflow         — current year
+    /cashflow YYYY    — specific year
+    /cashflow YYYY-MM — specific month
+    """
+    if not update.effective_user or not update.message:
+        return
+    today = date.today()
+    year, month = today.year, None
+
+    if ctx.args:
+        try:
+            parts = ctx.args[0].split("-")
+            year = int(parts[0])
+            month = int(parts[1]) if len(parts) > 1 else None
+        except Exception:
+            await update.message.reply_text("Usage: /cashflow, /cashflow YYYY, or /cashflow YYYY-MM")
+            return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        company = db.get(Company, user.company_id)
+        currency = company.base_currency if company else "ETB"
+        cf = financial_statements.cash_flow_statement(db, user.company_id, year, month)
+
+    period = f"{year}-{month:02d}" if month else str(year)
+
+    def _sign(v: float) -> str:
+        return f"+{v:,.2f}" if v >= 0 else f"{v:,.2f}"
+
+    lines = [
+        f"💧 *Cash Flow Statement — {period}*",
+        f"_(Confirmed transactions only)_",
+        "",
+        f"*A. OPERATING ACTIVITIES*",
+        f"  Cash received:    `{cf['operating']['inflows']:>12,.2f} {currency}`",
+        f"  Cash paid:        `{-cf['operating']['outflows']:>11,.2f} {currency}`",
+        f"  *Net Operating:   `{_sign(cf['operating']['net']):>11} {currency}`*",
+        "",
+        f"*B. INVESTING ACTIVITIES*",
+        f"  Proceeds:         `{cf['investing']['inflows']:>12,.2f} {currency}`",
+        f"  Payments:         `{-cf['investing']['outflows']:>11,.2f} {currency}`",
+        f"  *Net Investing:   `{_sign(cf['investing']['net']):>11} {currency}`*",
+        "",
+        f"*C. FINANCING ACTIVITIES*",
+        f"  Received:         `{cf['financing']['inflows']:>12,.2f} {currency}`",
+        f"  Repaid/Withdrawn: `{-cf['financing']['outflows']:>11,.2f} {currency}`",
+        f"  *Net Financing:   `{_sign(cf['financing']['net']):>11} {currency}`*",
+        "",
+        f"  ────────────────────────────────────",
+        f"*NET CHANGE IN CASH: `{_sign(cf['net_change_in_cash']):>8} {currency}`*",
+    ]
+
+    await _send_long(update, "\n".join(lines))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

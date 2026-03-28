@@ -35,6 +35,9 @@ async def post_init(application: Application) -> None:
         BotCommand("delete", "Delete a transaction by ID"),
         BotCommand("receipts", "List stored receipts by period"),
         BotCommand("export_receipts", "Download all receipts as ZIP"),
+        BotCommand("income_statement", "Profit & Loss statement"),
+        BotCommand("balance_sheet", "Assets, Liabilities & Equity"),
+        BotCommand("cashflow", "Cash Flow statement"),
     ])
 
 
@@ -61,6 +64,9 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("delete", commands.cmd_delete))
     app.add_handler(CommandHandler("receipts", commands.cmd_receipts))
     app.add_handler(CommandHandler("export_receipts", commands.cmd_export_receipts))
+    app.add_handler(CommandHandler("income_statement", commands.cmd_income_statement))
+    app.add_handler(CommandHandler("balance_sheet", commands.cmd_balance_sheet))
+    app.add_handler(CommandHandler("cashflow", commands.cmd_cashflow))
 
     # Message handlers
     app.add_handler(

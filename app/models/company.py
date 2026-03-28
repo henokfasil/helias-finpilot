@@ -28,6 +28,7 @@ class Company(Base, TimestampMixin):
     categories: Mapped[List["Category"]] = relationship("Category", back_populates="company", lazy="select")
     counterparties: Mapped[List["Counterparty"]] = relationship("Counterparty", back_populates="company", lazy="select")
     reports: Mapped[List["Report"]] = relationship("Report", back_populates="company", lazy="select")
+    account_snapshots: Mapped[List["AccountSnapshot"]] = relationship("AccountSnapshot", back_populates="company", lazy="select")
 
     def __repr__(self) -> str:
         return f"<Company id={self.id} name={self.name!r}>"
