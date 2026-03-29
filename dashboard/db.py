@@ -1,6 +1,16 @@
 """
 Dashboard database helpers — read-only queries returning pandas DataFrames.
-Uses the same SQLite database as the Telegram bot.
+Uses Supabase PostgreSQL (production) or SQLite (local dev).
+
+Functions:
+  load_transactions()      — all transactions with category/counterparty
+  load_attachments()       — receipt files
+  load_categories()        — active categories
+  load_company()           — company info dict
+  load_tax_data()          — confirmed transactions with tax fields
+  load_financial_data()    — confirmed transactions with activity_type (for financial statements)
+  load_account_snapshots() — manual Balance Sheet entries (account_snapshots table)
+  load_reports()           — saved generated reports
 """
 from __future__ import annotations
 
