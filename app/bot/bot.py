@@ -38,6 +38,12 @@ async def post_init(application: Application) -> None:
         BotCommand("income_statement", "Profit & Loss statement"),
         BotCommand("balance_sheet", "Assets, Liabilities & Equity"),
         BotCommand("cashflow", "Cash Flow statement"),
+        BotCommand("tag", "Tag transaction as investing/financing"),
+        BotCommand("add_asset", "Add asset to Balance Sheet"),
+        BotCommand("add_liability", "Add liability to Balance Sheet"),
+        BotCommand("add_equity", "Add equity entry to Balance Sheet"),
+        BotCommand("bs_entries", "List Balance Sheet manual entries"),
+        BotCommand("remove_entry", "Remove a Balance Sheet entry"),
     ])
 
 
@@ -67,6 +73,12 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("income_statement", commands.cmd_income_statement))
     app.add_handler(CommandHandler("balance_sheet", commands.cmd_balance_sheet))
     app.add_handler(CommandHandler("cashflow", commands.cmd_cashflow))
+    app.add_handler(CommandHandler("tag", commands.cmd_tag))
+    app.add_handler(CommandHandler("add_asset", commands.cmd_add_asset))
+    app.add_handler(CommandHandler("add_liability", commands.cmd_add_liability))
+    app.add_handler(CommandHandler("add_equity", commands.cmd_add_equity))
+    app.add_handler(CommandHandler("bs_entries", commands.cmd_bs_entries))
+    app.add_handler(CommandHandler("remove_entry", commands.cmd_remove_entry))
 
     # Message handlers
     app.add_handler(

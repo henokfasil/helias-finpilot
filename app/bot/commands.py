@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 
 from app.bot.utils import format_transaction_list
 from app.database import get_db_context
+from app.models.account_snapshot import AccountSnapshot
 from app.models.company import Company
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -38,9 +39,22 @@ Just send a message like:
 /annual\_report — full year report
 /report YYYY-MM — report for specific month
 /tax\_summary — Ethiopian VAT & WHT obligations
-/income\_statement — Profit & Loss statement
+
+*Financial Statements:*
+/income\_statement — Profit & Loss
 /balance\_sheet — Assets, Liabilities & Equity
 /cashflow — Cash Flow statement
+
+*Balance Sheet entries:*
+/add\_asset name amount — e.g. /add\_asset "Laptop" 75000
+/add\_liability name amount — e.g. /add\_liability "Bank Loan" 200000
+/add\_equity name amount — e.g. /add\_equity "Owner Capital" 500000
+
+*Cash Flow tagging:*
+/tag id type — tag tx as investing or financing
+  e.g. /tag 12 investing
+  e.g. /tag 15 financing
+
 /search keyword — search transactions
 /export — export transaction data
 """
@@ -500,6 +514,301 @@ async def cmd_tax_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         "_File and pay at your local MoR branch by the 30th of the following month._",
     ]
 
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+# ── Cash Flow tagging ────────────────────────────────────────────────────────
+
+async def cmd_tag(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /tag <id> <type>
+    Tag a transaction's activity type for the Cash Flow Statement.
+    Types: operating (default) | investing | financing
+
+    Examples:
+      /tag 12 investing   — laptop purchase
+      /tag 15 financing   — bank loan received
+      /tag 8 operating    — reset to default
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    if not ctx.args or len(ctx.args) < 2:
+        await update.message.reply_text(
+            "Usage: `/tag <id> <type>`\n\n"
+            "Types: `operating`, `investing`, `financing`\n\n"
+            "Examples:\n"
+            "  `/tag 12 investing` — equipment purchase\n"
+            "  `/tag 15 financing` — bank loan\n\n"
+            "Find IDs with /transactions",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        tx_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("First argument must be a transaction ID number.")
+        return
+
+    activity = ctx.args[1].lower().strip()
+    if activity not in ("operating", "investing", "financing"):
+        await update.message.reply_text(
+            "Activity type must be one of: `operating`, `investing`, `financing`",
+            parse_mode="Markdown",
+        )
+        return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        tx = db.query(Transaction).filter(
+            Transaction.id == tx_id,
+            Transaction.company_id == user.company_id,
+        ).first()
+        if not tx:
+            await update.message.reply_text(f"Transaction #{tx_id} not found.")
+            return
+        old_type = tx.activity_type or "operating"
+        tx.activity_type = activity
+
+    emoji = {"operating": "🔧", "investing": "🏗", "financing": "🏦"}.get(activity, "")
+    await update.message.reply_text(
+        f"{emoji} Transaction *#{tx_id}* tagged as *{activity}*.\n"
+        f"_(was: {old_type})_\n\n"
+        f"Amount: `{tx.amount:,.2f} {tx.currency}` — {tx.description or ''}",
+        parse_mode="Markdown",
+    )
+
+
+# ── Balance Sheet manual entries ──────────────────────────────────────────────
+
+async def _add_balance_sheet_entry(
+    update: Update,
+    ctx: ContextTypes.DEFAULT_TYPE,
+    account_type: str,
+    subtype: str,
+    type_label: str,
+    emoji: str,
+) -> None:
+    """Shared logic for /add_asset, /add_liability, /add_equity."""
+    if not update.effective_user or not update.message:
+        return
+
+    # Usage: /add_asset "Laptop & Equipment" 75000
+    # or:    /add_asset Laptop 75000
+    if not ctx.args or len(ctx.args) < 2:
+        await update.message.reply_text(
+            f"Usage: `/{type_label} \"Account Name\" amount [currency] [YYYY-MM-DD]`\n\n"
+            f"Examples:\n"
+            f"  `/{type_label} \"Laptop & Equipment\" 75000`\n"
+            f"  `/{type_label} \"Bank Loan\" 200000 ETB 2026-01-15`\n\n"
+            f"Currency defaults to ETB. Date defaults to today.",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Parse: name may be quoted or just a single word; amount is last numeric arg
+    args = ctx.args
+    # Find the amount (last numeric-looking arg before optional currency/date)
+    amount_idx = None
+    for i, a in enumerate(args):
+        try:
+            float(a.replace(",", ""))
+            amount_idx = i
+            break
+        except ValueError:
+            continue
+
+    if amount_idx is None:
+        await update.message.reply_text("Could not parse amount. Example: `/add_asset \"Equipment\" 75000`",
+                                        parse_mode="Markdown")
+        return
+
+    name = " ".join(args[:amount_idx]).strip('"').strip("'").strip()
+    if not name:
+        await update.message.reply_text("Please provide an account name before the amount.")
+        return
+
+    try:
+        from decimal import Decimal
+        amount = Decimal(args[amount_idx].replace(",", ""))
+    except Exception:
+        await update.message.reply_text("Invalid amount.")
+        return
+
+    # Optional: currency and date from remaining args
+    remaining = args[amount_idx + 1:]
+    currency = "ETB"
+    entry_date = date.today()
+    for r in remaining:
+        if r.upper() in ("ETB", "USD", "EUR"):
+            currency = r.upper()
+        else:
+            try:
+                entry_date = date.fromisoformat(r)
+            except ValueError:
+                pass
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        snap = AccountSnapshot(
+            company_id=user.company_id,
+            account_name=name,
+            account_type=account_type,
+            account_subtype=subtype,
+            amount=amount,
+            currency=currency,
+            entry_date=entry_date,
+            is_active=True,
+        )
+        db.add(snap)
+        db.flush()
+        snap_id = snap.id
+
+    await update.message.reply_text(
+        f"{emoji} *{account_type.capitalize()}* entry saved (ID: {snap_id})\n\n"
+        f"Name:     `{name}`\n"
+        f"Amount:   `{amount:,.2f} {currency}`\n"
+        f"Date:     `{entry_date}`\n"
+        f"Type:     `{account_type} / {subtype}`\n\n"
+        f"This will appear in your Balance Sheet immediately.\n"
+        f"Use `/remove_entry {snap_id}` to delete it.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_add_asset(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /add_asset "Name" amount [currency] [date]
+    Add a fixed or current asset to the Balance Sheet.
+
+    Examples:
+      /add_asset "Laptop & Equipment" 75000
+      /add_asset "Accounts Receivable" 50000 ETB 2026-03-01
+      /add_asset "Opening Cash Balance" 100000
+    """
+    await _add_balance_sheet_entry(update, ctx, "asset", "fixed_asset", "add_asset", "🏢")
+
+
+async def cmd_add_liability(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /add_liability "Name" amount [currency] [date]
+    Add a liability to the Balance Sheet.
+
+    Examples:
+      /add_liability "CBE Bank Loan" 500000
+      /add_liability "Accounts Payable" 30000 ETB 2026-03-15
+    """
+    await _add_balance_sheet_entry(update, ctx, "liability", "long_term_liability", "add_liability", "📋")
+
+
+async def cmd_add_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /add_equity "Name" amount [currency] [date]
+    Add an equity entry (owner's capital, share capital) to the Balance Sheet.
+
+    Examples:
+      /add_equity "Owner Capital Injection" 500000
+      /add_equity "Share Capital" 1000000 ETB 2026-01-01
+    """
+    await _add_balance_sheet_entry(update, ctx, "equity", "capital", "add_equity", "💼")
+
+
+async def cmd_remove_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /remove_entry <id>
+    Deactivate (soft-delete) a Balance Sheet entry from account_snapshots.
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    if not ctx.args:
+        await update.message.reply_text("Usage: `/remove_entry <id>`", parse_mode="Markdown")
+        return
+
+    try:
+        entry_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("ID must be a number.")
+        return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        snap = db.query(AccountSnapshot).filter(
+            AccountSnapshot.id == entry_id,
+            AccountSnapshot.company_id == user.company_id,
+        ).first()
+        if not snap:
+            await update.message.reply_text(f"Entry #{entry_id} not found.")
+            return
+        snap.is_active = False
+        name = snap.account_name
+        amount = snap.amount
+        currency = snap.currency
+
+    await update.message.reply_text(
+        f"🗑 Entry *#{entry_id}* (`{name}` — `{amount:,.2f} {currency}`) removed from Balance Sheet.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_bs_entries(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /bs_entries
+    List all active Balance Sheet manual entries (account_snapshots).
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+        entries = (
+            db.query(AccountSnapshot)
+            .filter(
+                AccountSnapshot.company_id == user.company_id,
+                AccountSnapshot.is_active == True,
+            )
+            .order_by(AccountSnapshot.account_type, AccountSnapshot.account_name)
+            .all()
+        )
+
+    if not entries:
+        await update.message.reply_text(
+            "No Balance Sheet entries yet.\n\n"
+            "Add some with:\n"
+            "  `/add_asset \"Equipment\" 75000`\n"
+            "  `/add_liability \"Bank Loan\" 200000`\n"
+            "  `/add_equity \"Owner Capital\" 500000`",
+            parse_mode="Markdown",
+        )
+        return
+
+    type_emoji = {"asset": "🏢", "liability": "📋", "equity": "💼"}
+    current_type = None
+    lines = ["📊 *Balance Sheet Manual Entries*\n"]
+
+    for e in entries:
+        if e.account_type != current_type:
+            current_type = e.account_type
+            lines.append(f"\n*{current_type.upper()}S*")
+        lines.append(
+            f"  `#{e.id}` {type_emoji.get(e.account_type, '')} {e.account_name[:25]:<25} "
+            f"`{e.amount:>10,.0f} {e.currency}`"
+        )
+
+    lines.append(f"\n_Use /remove\\_entry <id> to delete an entry._")
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
