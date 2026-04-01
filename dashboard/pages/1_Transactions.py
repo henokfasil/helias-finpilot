@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from dashboard.db import load_transactions, load_categories, load_company
+from dashboard.db import load_transactions, load_categories, load_company, delete_transactions
 from dashboard.components import page_header, divider
 
 st.set_page_config(page_title="Transactions · FinPilot", page_icon="📋", layout="wide")
@@ -92,14 +92,14 @@ if df.empty:
     st.info("No transactions match your filters.")
 else:
     display = df.copy()
-    display["date"]   = display["transaction_date"].dt.strftime("%Y-%m-%d")
+    display["date"]       = display["transaction_date"].dt.strftime("%Y-%m-%d")
     display["amount_fmt"] = display.apply(lambda r: f"{r['amount']:,.2f} {r['currency']}", axis=1)
 
     st.dataframe(
         display[[
             "id", "date", "transaction_type", "amount_fmt",
             "counterparty", "category", "description",
-            "payment_method", "status", "ai_confidence"
+            "payment_method", "status", "ai_confidence",
         ]].rename(columns={
             "id": "ID",
             "date": "Date",
@@ -115,7 +115,48 @@ else:
         use_container_width=True,
         hide_index=True,
         height=420,
+        column_config={
+            "ID": st.column_config.NumberColumn(
+                "ID",
+                help="Use this number with /delete on Telegram or in the Delete panel below",
+                width="small",
+                format="%d",
+            ),
+        },
     )
+
+    # ── Delete panel ───────────────────────────────────────────────────────────
+    with st.expander("🗑️ Delete transactions", expanded=False):
+        st.caption(
+            "Enter IDs from the table above, separated by commas or spaces. "
+            "Ranges like **3-7** are also supported. Example: `1, 3, 5-8`"
+        )
+        raw_ids = st.text_input("Transaction IDs to delete", placeholder="e.g. 4, 7, 10-13")
+        if st.button("Delete selected", type="primary"):
+            ids_to_delete: list[int] = []
+            for part in raw_ids.replace(",", " ").split():
+                part = part.strip()
+                if "-" in part:
+                    try:
+                        a, b = part.split("-", 1)
+                        ids_to_delete.extend(range(int(a), int(b) + 1))
+                    except ValueError:
+                        st.warning(f"Skipped unreadable range: `{part}`")
+                else:
+                    try:
+                        ids_to_delete.append(int(part))
+                    except ValueError:
+                        st.warning(f"Skipped invalid ID: `{part}`")
+
+            ids_to_delete = list(set(ids_to_delete))  # deduplicate
+            if not ids_to_delete:
+                st.warning("No valid IDs entered.")
+            else:
+                deleted = delete_transactions(ids_to_delete)
+                if deleted:
+                    st.success(f"Deleted {deleted} transaction(s). Refresh the page to see the updated list.")
+                else:
+                    st.error("No transactions were deleted. Check that the IDs exist and belong to your company.")
 
     # ── Export ─────────────────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)

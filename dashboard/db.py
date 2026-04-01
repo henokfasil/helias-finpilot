@@ -228,6 +228,27 @@ def load_account_snapshots(company_id: int = 1) -> pd.DataFrame:
     return df
 
 
+def delete_transactions(ids: list[int], company_id: int = 1) -> int:
+    """
+    Delete transactions by ID list. Only deletes rows belonging to company_id.
+    Returns the number of rows actually deleted.
+    """
+    if not ids:
+        return 0
+    engine = get_engine()
+    sql = text("""
+        DELETE FROM transactions
+        WHERE id = ANY(:ids) AND company_id = :cid
+    """)
+    with engine.begin() as conn:
+        result = conn.execute(sql, {"ids": ids, "cid": company_id})
+    # Invalidate cached data so the table refreshes immediately
+    load_transactions.clear()
+    load_tax_data.clear()
+    load_financial_data.clear()
+    return result.rowcount
+
+
 @st.cache_data(ttl=30)
 def load_reports(company_id: int = 1) -> pd.DataFrame:
     engine = get_engine()
