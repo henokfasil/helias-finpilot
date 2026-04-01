@@ -410,12 +410,17 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    # Parse IDs — support: "1 2 3" or "1-5" or mix
+    # Parse IDs — support: "1 2 3", "1,2,3", "1-5", or any mix
     ids_to_delete: list[int] = []
-    for arg in ctx.args:
+    # Flatten all args, splitting by commas too (Telegram may send "1,2,3" as one arg)
+    raw_tokens = " ".join(ctx.args).replace(",", " ").split()
+    for arg in raw_tokens:
+        arg = arg.strip()
+        if not arg:
+            continue
         if "-" in arg:
             try:
-                start, end = arg.split("-")
+                start, end = arg.split("-", 1)
                 ids_to_delete.extend(range(int(start), int(end) + 1))
             except ValueError:
                 await update.message.reply_text(f"Invalid range: `{arg}`. Use format: 1-5", parse_mode="Markdown")

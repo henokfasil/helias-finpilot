@@ -21,6 +21,22 @@ logger = logging.getLogger(__name__)
 _client = OpenAI(api_key=settings.openai_api_key)
 
 
+def _parse_json(content: str) -> dict:
+    """
+    Parse JSON from model output, stripping markdown code fences if present.
+    GPT-4o sometimes wraps output in ```json ... ``` even when asked not to.
+    """
+    text = content.strip()
+    # Strip ```json ... ``` or ``` ... ```
+    if text.startswith("```"):
+        text = text.split("```", 2)[1]          # drop opening fence
+        if text.lower().startswith("json"):
+            text = text[4:]                      # drop "json" language tag
+        if "```" in text:
+            text = text[:text.rindex("```")]     # drop closing fence
+    return json.loads(text.strip())
+
+
 @dataclass
 class ExtractedTransaction:
     """Value object produced by the extraction agent."""
@@ -64,11 +80,11 @@ def extract_from_text(raw_text: str) -> ExtractedTransaction:
             max_tokens=500,
         )
         content = response.choices[0].message.content or ""
-        data = json.loads(content.strip())
+        data = _parse_json(content)
         return _parse_extraction(data, raw_text)
 
     except json.JSONDecodeError as exc:
-        logger.error("ExtractionAgent: JSON parse error: %s", exc)
+        logger.error("ExtractionAgent: JSON parse error: %s | raw: %.200s", exc, content if 'content' in dir() else "")
         return ExtractedTransaction(
             raw_text=raw_text,
             confidence=0.0,
@@ -115,14 +131,14 @@ def extract_from_image(image_bytes: bytes, filename: str) -> ExtractedTransactio
                 },
             ],
             temperature=0.0,
-            max_tokens=500,
+            max_tokens=800,
         )
         content = response.choices[0].message.content or ""
-        data = json.loads(content.strip())
+        data = _parse_json(content)
         return _parse_extraction(data, f"[image: {filename}]")
 
     except json.JSONDecodeError as exc:
-        logger.error("ExtractionAgent (vision): JSON parse error: %s", exc)
+        logger.error("ExtractionAgent (vision): JSON parse error: %s | raw: %.200s", exc, content if 'content' in dir() else "")
         return ExtractedTransaction(
             raw_text=f"[image: {filename}]",
             confidence=0.0,
