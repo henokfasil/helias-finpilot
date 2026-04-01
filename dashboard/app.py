@@ -187,8 +187,9 @@ with col_right:
 
 # ── Recent transactions ───────────────────────────────────────────────────────
 st.markdown("#### Recent Transactions")
-if not all_txns.empty:
-    recent = all_txns.head(10).copy()
+visible_txns = all_txns[all_txns["status"] != "rejected"] if not all_txns.empty else all_txns
+if not visible_txns.empty:
+    recent = visible_txns.head(10).copy()
     recent["date"]   = recent["transaction_date"].dt.strftime("%Y-%m-%d")
     recent["amount"] = recent.apply(lambda r: f"{r['amount']:,.2f} {r['currency']}", axis=1)
     st.dataframe(
@@ -204,7 +205,7 @@ if not all_txns.empty:
         }
     )
 else:
-    st.info("No transactions recorded yet. Send a message to the Telegram bot to get started.")
+    st.info("No transactions yet. Send a message to your Telegram bot to get started.")
 
 st.caption(f"Helias FinPilot Dashboard · {company_name} · Data auto-refreshes every 30s")
 
