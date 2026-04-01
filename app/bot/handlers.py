@@ -309,15 +309,13 @@ async def _handle_confirmation(
             parse_mode="Markdown",
         )
 
-    elif lower == "edit":
+    elif lower in ("edit", "✏️"):
+        pending.clarification_field = "__edit_menu__"
+        bot_state.set_pending(chat_id, pending)
         await update.message.reply_text(  # type: ignore[union-attr]
-            "✏️ What would you like to correct?\n"
-            "Reply with: `field: new_value`\n\n"
-            "Fields: amount, currency, date, counterparty, description, type, category",
+            _edit_menu_text(pending.extracted),
             parse_mode="Markdown",
         )
-        pending.clarification_field = "__edit__"
-        bot_state.set_pending(chat_id, pending)
 
     elif lower == "force":
         # Force-save despite duplicate warning
@@ -350,19 +348,36 @@ async def _handle_clarification_answer(
     field = pending.clarification_field
     ex = pending.extracted
 
-    if field == "__edit__":
-        # Parse "field: value"
-        if ":" in answer:
-            f_name, f_val = answer.split(":", 1)
-            f_name = f_name.strip().lower()
-            f_val = f_val.strip()
-            _apply_edit(ex, f_name, f_val)
+    if field == "__edit_menu__":
+        try:
+            choice = int(answer.strip()) - 1
+            if 0 <= choice < len(_EDIT_FIELDS):
+                field_key, field_label = _EDIT_FIELDS[choice]
+                pending.clarification_field = f"__edit_value__{field_key}"
+                bot_state.set_pending(chat_id, pending)
+                current = _get_field_display(ex, field_key)
+                await update.message.reply_text(  # type: ignore[union-attr]
+                    f"Enter new *{field_label}*:\n_(current: `{current}`)_",
+                    parse_mode="Markdown",
+                )
+            else:
+                await update.message.reply_text(  # type: ignore[union-attr]
+                    f"Please reply with a number between 1 and {len(_EDIT_FIELDS)}."
+                )
+        except ValueError:
+            await update.message.reply_text(  # type: ignore[union-attr]
+                "Please reply with a number from the list."
+            )
+        return
+
+    if field and field.startswith("__edit_value__"):
+        field_key = field[len("__edit_value__"):]
+        _apply_edit(ex, field_key, answer)
         pending.clarification_field = None
-        # Show updated preview
+        bot_state.set_pending(chat_id, pending)
         preview = format_extraction_preview(ex)
         await update.message.reply_text(  # type: ignore[union-attr]
-            f"{preview}",
-            parse_mode="Markdown",
+            preview, parse_mode="Markdown"
         )
         return
 
@@ -399,6 +414,42 @@ async def _handle_clarification_answer(
 
 
 # ── Field edit helpers ────────────────────────────────────────────────────────
+
+_EDIT_FIELDS = [
+    ("amount",       "Amount"),
+    ("currency",     "Currency"),
+    ("date",         "Date  (YYYY-MM-DD)"),
+    ("counterparty", "Counterparty"),
+    ("description",  "Description"),
+    ("type",         "Type  (income / expense)"),
+    ("category",     "Category"),
+    ("payment",      "Payment method"),
+]
+
+
+def _get_field_display(ex, field_key: str) -> str:
+    mapping = {
+        "amount":       lambda e: f"{e.amount} {e.currency}" if e.amount else "—",
+        "currency":     lambda e: e.currency or "—",
+        "date":         lambda e: str(e.transaction_date) if e.transaction_date else "—",
+        "counterparty": lambda e: e.counterparty or "—",
+        "description":  lambda e: e.description or "—",
+        "type":         lambda e: e.transaction_type or "—",
+        "category":     lambda e: e.category_hint or "—",
+        "payment":      lambda e: e.payment_method or "—",
+    }
+    fn = mapping.get(field_key)
+    return fn(ex) if fn else "—"
+
+
+def _edit_menu_text(ex) -> str:
+    lines = ["✏️ *What would you like to edit?*\n"]
+    for i, (key, label) in enumerate(_EDIT_FIELDS, 1):
+        val = _get_field_display(ex, key)
+        lines.append(f"{i}. {label.split('(')[0].strip()}: `{val}`")
+    lines.append(f"\nReply with a number (1–{len(_EDIT_FIELDS)})")
+    return "\n".join(lines)
+
 
 def _apply_edit(ex, field: str, value: str) -> None:
     """Apply a user edit to an ExtractedTransaction."""
