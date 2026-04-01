@@ -4,8 +4,10 @@ Bot entry point — assembles the Application, registers handlers, and starts po
 from __future__ import annotations
 
 import logging
+import time
 
 from telegram import BotCommand
+from telegram.error import Conflict
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -92,6 +94,12 @@ def build_application() -> Application:
 
 
 def run() -> None:
-    logger.info("Starting Helias FinPilot bot…")
-    app = build_application()
-    app.run_polling(drop_pending_updates=True, timeout=10)
+    while True:
+        logger.info("Starting Helias FinPilot bot…")
+        app = build_application()
+        try:
+            app.run_polling(drop_pending_updates=True, timeout=10)
+            break  # clean exit
+        except Conflict:
+            logger.warning("Conflict: another getUpdates session is still active. Waiting 20s before retry…")
+            time.sleep(20)
