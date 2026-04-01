@@ -49,6 +49,7 @@ Just send a message like:
 /add\_asset name amount — e.g. /add\_asset "Laptop" 75000
 /add\_liability name amount — e.g. /add\_liability "Bank Loan" 200000
 /add\_equity name amount — e.g. /add\_equity "Owner Capital" 500000
+/loan lender amount — e.g. /loan "Henok" 1000000 (records inflow + liability)
 
 *Cash Flow tagging:*
 /tag id type — tag tx as investing or financing
@@ -725,6 +726,126 @@ async def cmd_add_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
       /add_equity "Share Capital" 1000000 ETB 2026-01-01
     """
     await _add_balance_sheet_entry(update, ctx, "equity", "capital", "add_equity", "💼")
+
+
+async def cmd_loan(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /loan "Lender Name" amount [currency] [YYYY-MM-DD]
+
+    Records a loan received in one step:
+      1. A confirmed 'transfer' transaction (financing) — cash inflow
+      2. A 'Loan Payable' liability in the Balance Sheet
+
+    Examples:
+      /loan "Henok" 1000000
+      /loan "CBE Bank" 500000 ETB 2026-04-01
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    if not ctx.args or len(ctx.args) < 2:
+        await update.message.reply_text(
+            "Usage: `/loan \"Lender Name\" amount [currency] [YYYY-MM-DD]`\n\n"
+            "Examples:\n"
+            "  `/loan \"Henok\" 1000000`\n"
+            "  `/loan \"CBE Bank\" 500000 ETB 2026-04-01`\n\n"
+            "This records:\n"
+            "  • Cash inflow transaction (financing)\n"
+            "  • Loan Payable liability on Balance Sheet",
+            parse_mode="Markdown",
+        )
+        return
+
+    args = ctx.args
+    # Find amount (first numeric arg)
+    amount_idx = None
+    for i, a in enumerate(args):
+        try:
+            float(a.replace(",", ""))
+            amount_idx = i
+            break
+        except ValueError:
+            continue
+
+    if amount_idx is None:
+        await update.message.reply_text("Could not parse amount. Example: `/loan \"Henok\" 1000000`", parse_mode="Markdown")
+        return
+
+    lender = " ".join(args[:amount_idx]).strip('"').strip("'").strip()
+    if not lender:
+        await update.message.reply_text("Please provide a lender name before the amount.")
+        return
+
+    try:
+        from decimal import Decimal
+        amount = Decimal(args[amount_idx].replace(",", ""))
+    except Exception:
+        await update.message.reply_text("Invalid amount.")
+        return
+
+    remaining = args[amount_idx + 1:]
+    currency = "ETB"
+    entry_date = date.today()
+    for r in remaining:
+        if r.upper() in ("ETB", "USD", "EUR"):
+            currency = r.upper()
+        else:
+            try:
+                entry_date = date.fromisoformat(r)
+            except ValueError:
+                pass
+
+    with get_db_context() as db:
+        user = _get_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("Please /start first.")
+            return
+
+        # 1. Cash inflow transaction (transfer, financing activity)
+        counterparty = transaction_service.get_or_create_counterparty(db, user.company_id, lender)
+        tx = Transaction(
+            company_id=user.company_id,
+            created_by_id=user.id,
+            counterparty_id=counterparty.id,
+            transaction_type="transfer",
+            activity_type="financing",
+            transaction_date=entry_date,
+            amount=amount,
+            currency=currency,
+            description=f"Loan received from {lender}",
+            status="confirmed",
+            ai_confidence=1.0,
+        )
+        db.add(tx)
+        db.flush()
+        tx_id = tx.id
+
+        # 2. Loan Payable liability on Balance Sheet
+        snap = AccountSnapshot(
+            company_id=user.company_id,
+            account_name=f"Loan Payable — {lender}",
+            account_type="liability",
+            account_subtype="long_term_liability",
+            amount=amount,
+            currency=currency,
+            entry_date=entry_date,
+            notes=f"Linked to transaction #{tx_id}",
+            is_active=True,
+        )
+        db.add(snap)
+        db.flush()
+        snap_id = snap.id
+
+    await update.message.reply_text(
+        f"🏦 *Loan recorded successfully*\n\n"
+        f"Lender:    `{lender}`\n"
+        f"Amount:    `{amount:,.2f} {currency}`\n"
+        f"Date:      `{entry_date}`\n\n"
+        f"✅ Transaction *#{tx_id}* — cash inflow (financing)\n"
+        f"📋 Balance Sheet entry *#{snap_id}* — Loan Payable\n\n"
+        f"_When you repay the loan, use /loan\\_repay or record the expense manually._",
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_remove_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

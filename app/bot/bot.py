@@ -46,6 +46,7 @@ async def post_init(application: Application) -> None:
         BotCommand("add_equity", "Add equity entry to Balance Sheet"),
         BotCommand("bs_entries", "List Balance Sheet manual entries"),
         BotCommand("remove_entry", "Remove a Balance Sheet entry"),
+        BotCommand("loan", "Record a loan received (cash + liability)"),
     ])
 
 
@@ -81,6 +82,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("add_equity", commands.cmd_add_equity))
     app.add_handler(CommandHandler("bs_entries", commands.cmd_bs_entries))
     app.add_handler(CommandHandler("remove_entry", commands.cmd_remove_entry))
+    app.add_handler(CommandHandler("loan", commands.cmd_loan))
 
     # Message handlers
     app.add_handler(
@@ -96,14 +98,6 @@ def build_application() -> Application:
 def run() -> None:
     logger.info("Starting Helias FinPilot bot…")
     app = build_application()
-    for attempt in range(1, 6):  # max 5 attempts
-        try:
-            app.run_polling(drop_pending_updates=True, timeout=10)
-            break  # clean exit
-        except Conflict:
-            if attempt < 5:
-                logger.warning("Conflict: another session active. Waiting 20s (attempt %d/5)…", attempt)
-                time.sleep(20)
-            else:
-                logger.error("Conflict persists after 5 attempts — exiting so systemd can restart.")
-                raise
+    app.run_polling(drop_pending_updates=True, timeout=10)
+    # On Conflict, the process exits and systemd restarts after 30s —
+    # enough time for Telegram to clear the previous session.
