@@ -143,6 +143,7 @@ async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user or not update.message:
         return
+    from calendar import monthrange
     today = date.today()
     with get_db_context() as db:
         user = _get_user(db, update.effective_user.id)
@@ -150,19 +151,34 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("Please /start first.")
             return
         company = db.get(Company, user.company_id)
-        summary = transaction_service.monthly_summary(
-            db, user.company_id, today.year, today.month
-        )
         currency = company.base_currency if company else "ETB"
-        income = summary.get("income", {}).get(currency, 0)
+
+        year, month = today.year, today.month
+        summary = transaction_service.monthly_summary(db, user.company_id, year, month)
+        income   = summary.get("income",  {}).get(currency, 0)
         expenses = summary.get("expense", {}).get(currency, 0)
-        net = income - expenses
+
+        # If current month is empty, fall back to last month
+        fallback_note = ""
+        if income == 0 and expenses == 0:
+            if month == 1:
+                year, month = year - 1, 12
+            else:
+                year, month = year, month - 1
+            summary  = transaction_service.monthly_summary(db, user.company_id, year, month)
+            income   = summary.get("income",  {}).get(currency, 0)
+            expenses = summary.get("expense", {}).get(currency, 0)
+            fallback_note = "\n_ℹ️ No data for current month — showing last month._"
+
+        period = date(year, month, 1).strftime("%B %Y")
+        net  = income - expenses
         sign = "+" if net >= 0 else ""
         text = (
-            f"📊 *{today.strftime('%B %Y')} Snapshot*\n\n"
+            f"📊 *{period} Snapshot*\n\n"
             f"💰 Income:   `{income:>12,.2f} {currency}`\n"
             f"💸 Expenses: `{expenses:>12,.2f} {currency}`\n"
             f"📈 Net:      `{sign}{net:>11,.2f} {currency}`"
+            f"{fallback_note}"
         )
         await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -172,12 +188,14 @@ async def cmd_monthly_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         return
     today = date.today()
     year, month = today.year, today.month
+    explicit = False
 
     # Allow /report YYYY-MM
     if ctx.args:
         try:
             parts = ctx.args[0].split("-")
             year, month = int(parts[0]), int(parts[1])
+            explicit = True
         except Exception:
             await update.message.reply_text("Usage: /report YYYY-MM")
             return
@@ -190,6 +208,17 @@ async def cmd_monthly_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         company = db.get(Company, user.company_id)
         if not company:
             return
+
+        # If no explicit period given and current month is empty, use last month
+        if not explicit:
+            summary = transaction_service.monthly_summary(db, user.company_id, year, month)
+            currency = company.base_currency or "ETB"
+            if not summary.get("income", {}).get(currency) and not summary.get("expense", {}).get(currency):
+                if month == 1:
+                    year, month = year - 1, 12
+                else:
+                    year, month = year, month - 1
+
         await update.message.reply_text("⏳ Generating report…")
         content = report_service.generate_monthly_report(
             db,

@@ -65,8 +65,8 @@ expense_df  = confirmed[confirmed["transaction_type"] == "expense"]
 total_income   = income_df["amount"].sum()
 total_expenses = expense_df["amount"].sum()
 net_result     = total_income - total_expenses
-tx_count       = len(confirmed)
-pending_count  = len(all_txns[all_txns["status"].isin(["draft", "needs_clarification"])])
+tx_count       = len(all_txns[all_txns["status"] != "rejected"]) if not all_txns.empty else 0
+pending_count  = len(all_txns[all_txns["status"].isin(["draft", "needs_clarification"])]) if not all_txns.empty else 0
 
 # ── Header ────────────────────────────────────────────────────────────────────
 page_header(
