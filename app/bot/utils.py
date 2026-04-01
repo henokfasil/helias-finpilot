@@ -49,8 +49,11 @@ def format_extraction_preview(ex: ExtractedTransaction) -> str:
     if ex.is_vat_inclusive:
         lines.append("ℹ️ _Amount is VAT-inclusive_")
 
-    if ex.ambiguity_flags:
-        lines.append(f"⚠️ Unclear: `{', '.join(ex.ambiguity_flags)}`")
+    other_flags = [f for f in ex.ambiguity_flags if f != "date_converted_from_ethiopian"]
+    if "date_converted_from_ethiopian" in ex.ambiguity_flags:
+        lines.append("🗓 _Date converted from Ethiopian calendar to Gregorian_")
+    if other_flags:
+        lines.append(f"⚠️ Unclear: `{', '.join(other_flags)}`")
 
     lines += [
         "",

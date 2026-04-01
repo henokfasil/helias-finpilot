@@ -205,12 +205,42 @@ def _extract_from_image_openai(image_bytes: bytes, filename: str) -> ExtractedTr
         )
 
 
+def _et_to_gregorian(d: date) -> tuple[date, bool]:
+    """
+    If a date's year looks like an Ethiopian calendar year (2010–2020),
+    convert it to Gregorian.
+
+    Ethiopian year N spans:
+      - Gregorian Sept 11 of (N+7) through Sept 10 of (N+8)
+    Conversion rule:
+      - Month 9–12 (Sept–Dec) → Gregorian year = ET year + 7
+      - Month 1–8  (Jan–Aug)  → Gregorian year = ET year + 8
+
+    Returns (converted_date, was_converted).
+    """
+    ET_MIN, ET_MAX = 2010, 2020
+    if not (ET_MIN <= d.year <= ET_MAX):
+        return d, False
+    gregorian_year = d.year + 7 if d.month >= 9 else d.year + 8
+    try:
+        return d.replace(year=gregorian_year), True
+    except ValueError:
+        # Feb 29 edge case
+        return d.replace(year=gregorian_year, day=28), True
+
+
 def _parse_extraction(data: dict, raw_text: str) -> ExtractedTransaction:
     """Convert raw JSON dict from AI into typed ExtractedTransaction."""
     tx_date = None
+    ambiguity_flags = list(data.get("ambiguity_flags", []))
+
     if data.get("transaction_date"):
         try:
             tx_date = date.fromisoformat(data["transaction_date"])
+            # Safety net: if AI returned an Ethiopian-range year, convert it
+            tx_date, converted = _et_to_gregorian(tx_date)
+            if converted and "date_converted_from_ethiopian" not in ambiguity_flags:
+                ambiguity_flags.append("date_converted_from_ethiopian")
         except ValueError:
             pass
 
@@ -241,6 +271,6 @@ def _parse_extraction(data: dict, raw_text: str) -> ExtractedTransaction:
         withholding_tax=withholding_tax,
         is_vat_inclusive=bool(data.get("is_vat_inclusive", False)),
         confidence=float(data.get("confidence", 0.5)),
-        ambiguity_flags=list(data.get("ambiguity_flags", [])),
+        ambiguity_flags=ambiguity_flags,
         raw_text=raw_text,
     )

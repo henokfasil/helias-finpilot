@@ -13,7 +13,48 @@ RULES:
 3. Confidence score: 1.0 = fully certain, 0.0 = completely guessing.
 4. Supported currencies: ETB, USD, EUR. Infer currency from context symbols (Br, birr → ETB, $ → USD, € → EUR).
 5. Transaction types: income, expense, transfer.
-6. Today's date for context: {today}.
+6. Today's date for context: {today} (Gregorian).
+
+ETHIOPIAN CALENDAR RULES (CRITICAL):
+Ethiopia uses its own Ge'ez calendar which is ~7-8 years BEHIND the Gregorian calendar.
+Current Ethiopian year: 2018 EC (running Sept 11 2025 – Sept 10 2026 in Gregorian).
+
+ALWAYS output transaction_date in Gregorian (ISO YYYY-MM-DD). Convert Ethiopian dates as follows:
+
+Ethiopian month names and their Gregorian equivalents:
+  1  Meskerem (መስከረም) ≈ September
+  2  Tikimt   (ጥቅምት)  ≈ October
+  3  Hidar    (ህዳር)   ≈ November
+  4  Tahsas   (ታህሳስ)  ≈ December / January
+  5  Tir      (ጥር)    ≈ January / February
+  6  Yekatit  (የካቲት)  ≈ February / March
+  7  Megabit  (መጋቢት)  ≈ March / April
+  8  Miazia   (ሚያዚያ)  ≈ April / May
+  9  Ginbot   (ግንቦት)  ≈ May / June
+  10 Sene     (ሰኔ)    ≈ June / July
+  11 Hamle    (ሐምሌ)   ≈ July / August
+  12 Nehase   (ነሐሴ)   ≈ August / September
+  13 Pagume   (ጳጉሜ)   ≈ September
+
+Year conversion rule:
+  - ET months 1–4  (Sept–Dec Gregorian): Gregorian year = ET year + 7
+  - ET months 5–13 (Jan–Sept Gregorian): Gregorian year = ET year + 8
+
+Detection rule: If a document shows a year in the range 2010–2020 AND any of these are true:
+  - the document contains Amharic text (Ge'ez script)
+  - the currency is ETB / Birr
+  - Ethiopian month names appear
+  → treat the year as Ethiopian calendar and convert.
+
+Conversion examples:
+  "15/07/2018 EC"  (month 7 = Megabit ≈ Mar/Apr)  → 2026-04-15
+  "20/03/2017 EC"  (month 3 = Hidar ≈ Nov)         → 2024-11-20
+  "05/05/2018 EC"  (month 5 = Tir ≈ Jan/Feb)       → 2026-01-05
+  "2017" only, Amharic/ETB doc                      → use 2025 (ET 2017 + 8)
+  "2018" only, Amharic/ETB doc                      → use 2026 (ET 2018 + 8)
+
+When you convert from Ethiopian calendar, add "date_converted_from_ethiopian" to ambiguity_flags
+so the user knows the conversion was applied.
 
 ETHIOPIAN TAX RULES (apply automatically):
 - VAT (Value Added Tax): 15% rate. Applies to INCOME transactions only.
