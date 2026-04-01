@@ -112,15 +112,62 @@ def extract_from_text(raw_text: str) -> ExtractedTransaction:
 
 def extract_from_image(image_bytes: bytes, filename: str) -> ExtractedTransaction:
     """
-    Use GPT-4o vision to extract transaction data from an image.
+    Extract transaction data from an image.
+    Uses Gemini 2.0 Flash if GEMINI_API_KEY is configured (better Amharic/multilingual support),
+    falls back to GPT-4o vision otherwise.
     """
+    if settings.gemini_api_key:
+        return _extract_from_image_gemini(image_bytes, filename)
+    return _extract_from_image_openai(image_bytes, filename)
+
+
+def _extract_from_image_gemini(image_bytes: bytes, filename: str) -> ExtractedTransaction:
+    """Use Gemini 2.0 Flash for image extraction — superior Amharic/multilingual support."""
+    import io
+    import PIL.Image
+    import google.generativeai as genai
+
+    today_str = date.today().isoformat()
+    prompt = (
+        EXTRACTION_SYSTEM_PROMPT.format(today=today_str)
+        + "\n\nExtract transaction data from this receipt/document. "
+        "The document may be in Amharic, English, or mixed. Return valid JSON only."
+    )
+
+    content = ""
+    try:
+        genai.configure(api_key=settings.gemini_api_key)
+        model = genai.GenerativeModel(settings.gemini_vision_model)
+        image = PIL.Image.open(io.BytesIO(image_bytes))
+        response = model.generate_content(
+            [prompt, image],
+            generation_config={"temperature": 0.0, "max_output_tokens": 800},
+        )
+        content = response.text or ""
+        data = _parse_json(content)
+        return _parse_extraction(data, f"[image: {filename}]")
+
+    except json.JSONDecodeError as exc:
+        logger.error("Gemini (vision): JSON parse error: %s | raw: %.200s", exc, content)
+        return ExtractedTransaction(
+            raw_text=f"[image: {filename}]",
+            confidence=0.0,
+            ambiguity_flags=["ai_parse_error"],
+        )
+    except Exception as exc:
+        logger.error("Gemini (vision): unexpected error: %s — falling back to GPT-4o", exc)
+        return _extract_from_image_openai(image_bytes, filename)
+
+
+def _extract_from_image_openai(image_bytes: bytes, filename: str) -> ExtractedTransaction:
+    """GPT-4o vision fallback for image extraction."""
     import base64
 
     today_str = date.today().isoformat()
     system_prompt = EXTRACTION_SYSTEM_PROMPT.format(today=today_str)
     b64 = base64.b64encode(image_bytes).decode("utf-8")
-
     mime = "image/png" if filename.lower().endswith(".png") else "image/jpeg"
+    content = ""
 
     try:
         response = _client.chat.completions.create(
@@ -130,14 +177,8 @@ def extract_from_image(image_bytes: bytes, filename: str) -> ExtractedTransactio
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": "Extract transaction data from this document/receipt. Return valid JSON only.",
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:{mime};base64,{b64}"},
-                        },
+                        {"type": "text", "text": "Extract transaction data from this document/receipt. Return valid JSON only."},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
                     ],
                 },
             ],
@@ -149,14 +190,14 @@ def extract_from_image(image_bytes: bytes, filename: str) -> ExtractedTransactio
         return _parse_extraction(data, f"[image: {filename}]")
 
     except json.JSONDecodeError as exc:
-        logger.error("ExtractionAgent (vision): JSON parse error: %s | raw: %.200s", exc, content if 'content' in dir() else "")
+        logger.error("GPT-4o (vision): JSON parse error: %s | raw: %.200s", exc, content)
         return ExtractedTransaction(
             raw_text=f"[image: {filename}]",
             confidence=0.0,
             ambiguity_flags=["ai_parse_error"],
         )
     except Exception as exc:
-        logger.error("ExtractionAgent (vision): unexpected error: %s", exc)
+        logger.error("GPT-4o (vision): unexpected error: %s", exc)
         return ExtractedTransaction(
             raw_text=f"[image: {filename}]",
             confidence=0.0,
