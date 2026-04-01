@@ -94,4 +94,4 @@ def build_application() -> Application:
 def run() -> None:
     logger.info("Starting Helias FinPilot bot…")
     app = build_application()
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True, timeout=10, read_timeout=15)
