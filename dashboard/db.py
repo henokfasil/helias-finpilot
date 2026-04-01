@@ -62,6 +62,7 @@ def load_transactions(company_id: int = 1) -> pd.DataFrame:
             t.currency,
             t.description,
             t.payment_method,
+            t.reference_number,
             t.status,
             t.ai_confidence,
             t.raw_text,

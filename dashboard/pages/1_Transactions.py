@@ -99,7 +99,7 @@ else:
         display[[
             "id", "date", "transaction_type", "amount_fmt",
             "counterparty", "category", "description",
-            "payment_method", "status", "ai_confidence",
+            "reference_number", "payment_method", "status", "ai_confidence",
         ]].rename(columns={
             "id": "ID",
             "date": "Date",
@@ -108,6 +108,7 @@ else:
             "counterparty": "Counterparty",
             "category": "Category",
             "description": "Description",
+            "reference_number": "Receipt No",
             "payment_method": "Payment",
             "status": "Status",
             "ai_confidence": "AI Conf.",

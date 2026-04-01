@@ -429,6 +429,7 @@ _EDIT_FIELDS = [
     ("type",         "Type  (income / expense)"),
     ("category",     "Category"),
     ("payment",      "Payment method"),
+    ("receipt_no",   "Receipt / Reference number"),
 ]
 
 
@@ -442,6 +443,7 @@ def _get_field_display(ex, field_key: str) -> str:
         "type":         lambda e: e.transaction_type or "—",
         "category":     lambda e: e.category_hint or "—",
         "payment":      lambda e: e.payment_method or "—",
+        "receipt_no":   lambda e: e.reference_number or "—",
     }
     fn = mapping.get(field_key)
     return fn(ex) if fn else "—"
@@ -468,6 +470,9 @@ def _apply_edit(ex, field: str, value: str) -> None:
         "category": "category_hint",
         "payment": "payment_method",
         "method": "payment_method",
+        "receipt_no": "reference_number",
+        "receipt": "reference_number",
+        "reference": "reference_number",
     }
     attr = field_map.get(field.lower())
     if not attr:
@@ -509,6 +514,8 @@ def _apply_clarification(ex, field: str, value: str) -> None:
         ex.category_hint = value.strip()
     elif field == "payment_method":
         ex.payment_method = value.lower().strip()
+    elif field == "reference_number":
+        ex.reference_number = value.strip()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -36,6 +36,7 @@ def format_extraction_preview(ex: ExtractedTransaction) -> str:
         f"Description:  `{ex.description or '—'}`",
         f"Category:     `{ex.category_hint or '—'}`",
         f"Payment:      `{ex.payment_method or '—'}`",
+        f"Receipt No:   `{ex.reference_number or '—'}`",
         f"Confidence:   `{ex.confidence:.0%}`",
     ]
 
@@ -79,6 +80,8 @@ def format_transaction_list(transactions: list) -> str:
         )
         if tx.description:
             lines.append(f"   _{tx.description[:60]}_")
+        if tx.reference_number:
+            lines.append(f"   🧾 Receipt: `{tx.reference_number}`")
 
     lines.append("")
     lines.append("_To delete: /delete <ID>  e.g. /delete 1_")
