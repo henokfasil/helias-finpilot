@@ -395,6 +395,11 @@ async def _handle_clarification_answer(
     _apply_clarification(ex, field, answer)
     pending.clarification_field = None
 
+    # If user manually filled all fields, boost confidence so preview shows something sensible
+    if ex.confidence < 0.5 and ex.amount and ex.currency and ex.transaction_type and ex.transaction_date:
+        ex.confidence = 0.75
+        ex.ambiguity_flags = [f for f in ex.ambiguity_flags if f not in ("ai_parse_error", "ai_error")]
+
     # Re-validate
     from app.agents.validation import validate
     validation = validate(ex)

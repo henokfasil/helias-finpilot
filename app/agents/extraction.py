@@ -23,18 +23,29 @@ _client = OpenAI(api_key=settings.openai_api_key)
 
 def _parse_json(content: str) -> dict:
     """
-    Parse JSON from model output, stripping markdown code fences if present.
-    GPT-4o sometimes wraps output in ```json ... ``` even when asked not to.
+    Parse JSON from model output robustly.
+    Handles: clean JSON, ```json ... ```, ``` ... ```, or JSON buried in text.
     """
+    import re
     text = content.strip()
-    # Strip ```json ... ``` or ``` ... ```
-    if text.startswith("```"):
-        text = text.split("```", 2)[1]          # drop opening fence
-        if text.lower().startswith("json"):
-            text = text[4:]                      # drop "json" language tag
-        if "```" in text:
-            text = text[:text.rindex("```")]     # drop closing fence
-    return json.loads(text.strip())
+
+    # 1. Try direct parse first (clean response)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Extract from ```json ... ``` or ``` ... ``` anywhere in the text
+    m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
+    if m:
+        return json.loads(m.group(1))
+
+    # 3. Find first {...} block anywhere in the text
+    m = re.search(r"\{[\s\S]*\}", text)
+    if m:
+        return json.loads(m.group(0))
+
+    raise json.JSONDecodeError("No JSON found in model response", text, 0)
 
 
 @dataclass

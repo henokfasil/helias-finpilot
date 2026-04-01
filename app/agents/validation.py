@@ -51,15 +51,8 @@ def validate(extracted: "ExtractedTransaction") -> ValidationResult:
     if not extracted.counterparty:
         missing.append("counterparty")
 
-    # If confidence is low, add a general confirmation question
-    if extracted.confidence < CONFIDENCE_THRESHOLD:
-        questions.append(
-            (
-                "general",
-                f"I'm not fully confident (score: {extracted.confidence:.0%}). "
-                "Please review the details above and confirm or correct.",
-            )
-        )
+    # Low confidence is shown in the preview (Confidence: X%) and the user
+    # is already asked to reply yes/no/edit — no extra question needed here.
 
     is_valid = len([f for f in missing if f in ("amount", "currency", "transaction_type")]) == 0
 
