@@ -201,7 +201,7 @@ async def handle_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 
 def _is_confirmation(text: str) -> bool:
     lower = text.lower().strip()
-    return lower in ("yes", "y", "no", "n", "edit", "✅", "❌", "✏️", "confirm", "discard", "income", "expense", "💰", "💸")
+    return lower in ("yes", "y", "no", "n", "edit", "✅", "❌", "✏️", "confirm", "discard", "income", "expense", "💰", "💸", "force", "save")
 
 
 async def _handle_confirmation(
@@ -391,10 +391,26 @@ async def _handle_clarification_answer(
         return
 
     if field == "__duplicate_check__":
-        if answer.lower() in ("force", "yes", "y"):
-            pending.clarification_field = None
-            # Reuse confirmation logic
-            await _handle_confirmation(update, ctx, pending, "yes", chat_id)
+        if answer.lower() in ("force", "yes", "y", "save"):
+            # Force-save directly — do NOT call _handle_confirmation again
+            # as that would re-run the duplicate check and loop forever
+            with get_db_context() as db:
+                user = _get_user(db, tg_user.id)
+                if not user:
+                    return
+                tx = transaction_service.create_from_extraction(
+                    db,
+                    company_id=user.company_id,
+                    extracted=pending.extracted,
+                    user_telegram_id=tg_user.id,
+                    user_db_id=user.id,
+                )
+                tx = transaction_service.confirm_transaction(db, tx, tg_user.id)
+                tx_id = tx.id
+            bot_state.clear_pending(chat_id)
+            await update.message.reply_text(  # type: ignore[union-attr]
+                f"✅ Saved as transaction *#{tx_id}*.", parse_mode="Markdown"
+            )
         else:
             bot_state.clear_pending(chat_id)
             await update.message.reply_text("❌ Transaction discarded.")  # type: ignore[union-attr]
