@@ -57,6 +57,7 @@ def load_transactions(company_id: int = 1) -> pd.DataFrame:
         SELECT
             t.id,
             t.transaction_date,
+            t.transaction_date_et,
             t.transaction_type,
             t.amount,
             t.currency,

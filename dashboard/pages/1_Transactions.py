@@ -92,17 +92,19 @@ if df.empty:
     st.info("No transactions match your filters.")
 else:
     display = df.copy()
-    display["date"]       = display["transaction_date"].dt.strftime("%Y-%m-%d")
+    display["date_gr"]    = display["transaction_date"].dt.strftime("%Y-%m-%d")
+    display["date_et"]    = display["transaction_date_et"].fillna("—") if "transaction_date_et" in display.columns else "—"
     display["amount_fmt"] = display.apply(lambda r: f"{r['amount']:,.2f} {r['currency']}", axis=1)
 
     st.dataframe(
         display[[
-            "id", "date", "transaction_type", "amount_fmt",
+            "id", "date_gr", "date_et", "transaction_type", "amount_fmt",
             "counterparty", "category", "description",
             "reference_number", "payment_method", "status", "ai_confidence",
         ]].rename(columns={
             "id": "ID",
-            "date": "Date",
+            "date_gr": "Date (GR)",
+            "date_et": "Date (ET)",
             "transaction_type": "Type",
             "amount_fmt": "Amount",
             "counterparty": "Counterparty",
@@ -161,7 +163,8 @@ else:
 
     # ── Export ─────────────────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
-    csv = display.drop(columns=["transaction_date"]).to_csv(index=False).encode()
+    drop_cols = [c for c in ["transaction_date", "transaction_date_et"] if c in display.columns]
+    csv = display.drop(columns=drop_cols).to_csv(index=False).encode()
     st.download_button(
         label="⬇️ Download as CSV",
         data=csv,

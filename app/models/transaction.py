@@ -24,7 +24,8 @@ class Transaction(Base, TimestampMixin):
     counterparty_id: Mapped[Optional[int]] = mapped_column(ForeignKey("counterparties.id"), nullable=True)
 
     transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    transaction_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    transaction_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)       # Gregorian
+    transaction_date_et: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Ethiopian "DD/MM/YYYY EC"
     entry_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)

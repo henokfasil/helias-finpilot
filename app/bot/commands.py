@@ -17,6 +17,7 @@ from app.models.company import Company
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services import report_service, transaction_service, financial_statements
+from app.utils.ethiopian_calendar import gregorian_to_et_string, gregorian_to_et_label
 
 logger = logging.getLogger(__name__)
 
@@ -839,6 +840,7 @@ async def cmd_loan(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             transaction_type="transfer",
             activity_type="financing",
             transaction_date=entry_date,
+            transaction_date_et=gregorian_to_et_string(entry_date),
             amount=amount,
             currency=currency,
             description=f"Loan received from {lender}",

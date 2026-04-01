@@ -17,6 +17,7 @@ from app.agents.extraction import ExtractedTransaction
 from app.models.counterparty import Counterparty
 from app.models.transaction import Transaction
 from app.services import audit_service
+from app.utils.ethiopian_calendar import gregorian_to_et_string
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,13 @@ def create_from_extraction(
         db, company_id, extracted.category_hint, extracted.transaction_type
     )
 
+    et_date_str = None
+    if extracted.transaction_date:
+        try:
+            et_date_str = gregorian_to_et_string(extracted.transaction_date)
+        except Exception:
+            pass
+
     tx = Transaction(
         company_id=company_id,
         created_by_id=user_db_id,
@@ -98,6 +106,7 @@ def create_from_extraction(
         counterparty_id=counterparty.id if counterparty else None,
         transaction_type=extracted.transaction_type or "expense",
         transaction_date=extracted.transaction_date,
+        transaction_date_et=et_date_str,
         amount=extracted.amount or Decimal("0"),
         currency=extracted.currency or "ETB",
         description=extracted.description,

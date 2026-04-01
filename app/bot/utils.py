@@ -7,6 +7,7 @@ from datetime import date
 from typing import Optional
 
 from app.agents.extraction import ExtractedTransaction
+from app.utils.ethiopian_calendar import gregorian_to_et_label
 
 
 TRANSACTION_TYPE_EMOJI = {
@@ -31,7 +32,8 @@ def format_extraction_preview(ex: ExtractedTransaction) -> str:
         "",
         f"Type:         `{ex.transaction_type or '?'}`",
         f"Amount:       `{ex.amount or '?'} {ex.currency or '?'}`",
-        f"Date:         `{ex.transaction_date or 'unknown'}`",
+        f"Date (GR):    `{ex.transaction_date or 'unknown'}`",
+        f"Date (ET):    `{gregorian_to_et_label(ex.transaction_date) if ex.transaction_date else 'unknown'}`",
         f"Counterparty: `{ex.counterparty or 'unknown'}`",
         f"Description:  `{ex.description or '—'}`",
         f"Category:     `{ex.category_hint or '—'}`",
