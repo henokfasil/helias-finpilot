@@ -114,7 +114,9 @@ async def cmd_transactions(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         if not user:
             await update.message.reply_text("Please /start first.")
             return
-        txns = transaction_service.list_transactions(db, user.company_id, limit=15)
+        txns = transaction_service.list_transactions(
+            db, user.company_id, exclude_statuses=["rejected"], limit=15
+        )
         text = format_transaction_list(txns)
         await update.message.reply_text(text, parse_mode="Markdown")
 

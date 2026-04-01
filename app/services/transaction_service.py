@@ -175,6 +175,7 @@ def list_transactions(
     db: Session,
     company_id: int,
     status: Optional[str] = None,
+    exclude_statuses: Optional[list] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
     limit: int = 20,
@@ -183,6 +184,8 @@ def list_transactions(
     q = db.query(Transaction).filter(Transaction.company_id == company_id)
     if status:
         q = q.filter(Transaction.status == status)
+    if exclude_statuses:
+        q = q.filter(Transaction.status.notin_(exclude_statuses))
     if year:
         q = q.filter(extract("year", Transaction.transaction_date) == year)
     if month:
