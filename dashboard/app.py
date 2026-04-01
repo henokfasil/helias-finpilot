@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import time
 from datetime import date
 import pandas as pd
 import plotly.express as px
@@ -206,3 +207,7 @@ else:
     st.info("No transactions recorded yet. Send a message to the Telegram bot to get started.")
 
 st.caption(f"Helias FinPilot Dashboard · {company_name} · Data auto-refreshes every 30s")
+
+# Auto-refresh: wait 30 s then rerun this page so KPIs and charts stay live
+time.sleep(30)
+st.rerun()
