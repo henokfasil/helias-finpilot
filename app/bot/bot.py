@@ -94,12 +94,16 @@ def build_application() -> Application:
 
 
 def run() -> None:
-    while True:
-        logger.info("Starting Helias FinPilot bot…")
-        app = build_application()
+    logger.info("Starting Helias FinPilot bot…")
+    app = build_application()
+    for attempt in range(1, 6):  # max 5 attempts
         try:
             app.run_polling(drop_pending_updates=True, timeout=10)
             break  # clean exit
         except Conflict:
-            logger.warning("Conflict: another getUpdates session is still active. Waiting 20s before retry…")
-            time.sleep(20)
+            if attempt < 5:
+                logger.warning("Conflict: another session active. Waiting 20s (attempt %d/5)…", attempt)
+                time.sleep(20)
+            else:
+                logger.error("Conflict persists after 5 attempts — exiting so systemd can restart.")
+                raise
