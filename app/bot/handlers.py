@@ -350,9 +350,17 @@ async def _handle_clarification_answer(
 
     if field == "__edit_menu__":
         try:
-            choice = int(answer.strip()) - 1
-            if 0 <= choice < len(_EDIT_FIELDS):
-                field_key, field_label = _EDIT_FIELDS[choice]
+            choice = int(answer.strip())
+            if choice == 0:
+                # Done editing — show final confirmation preview
+                pending.clarification_field = None
+                bot_state.set_pending(chat_id, pending)
+                preview = format_extraction_preview(ex)
+                await update.message.reply_text(  # type: ignore[union-attr]
+                    preview, parse_mode="Markdown"
+                )
+            elif 1 <= choice <= len(_EDIT_FIELDS):
+                field_key, field_label = _EDIT_FIELDS[choice - 1]
                 pending.clarification_field = f"__edit_value__{field_key}"
                 bot_state.set_pending(chat_id, pending)
                 current = _get_field_display(ex, field_key)
@@ -362,7 +370,7 @@ async def _handle_clarification_answer(
                 )
             else:
                 await update.message.reply_text(  # type: ignore[union-attr]
-                    f"Please reply with a number between 1 and {len(_EDIT_FIELDS)}."
+                    f"Reply 0 to finish, or 1–{len(_EDIT_FIELDS)} to edit a field."
                 )
         except ValueError:
             await update.message.reply_text(  # type: ignore[union-attr]
@@ -373,11 +381,12 @@ async def _handle_clarification_answer(
     if field and field.startswith("__edit_value__"):
         field_key = field[len("__edit_value__"):]
         _apply_edit(ex, field_key, answer)
-        pending.clarification_field = None
+        # Stay in edit menu so user can edit more fields
+        pending.clarification_field = "__edit_menu__"
         bot_state.set_pending(chat_id, pending)
-        preview = format_extraction_preview(ex)
         await update.message.reply_text(  # type: ignore[union-attr]
-            preview, parse_mode="Markdown"
+            _edit_menu_text(ex),
+            parse_mode="Markdown",
         )
         return
 
@@ -450,11 +459,11 @@ def _get_field_display(ex, field_key: str) -> str:
 
 
 def _edit_menu_text(ex) -> str:
-    lines = ["✏️ *What would you like to edit?*\n"]
+    lines = ["✏️ *Edit fields — reply with a number:*\n"]
     for i, (key, label) in enumerate(_EDIT_FIELDS, 1):
         val = _get_field_display(ex, key)
         lines.append(f"{i}. {label.split('(')[0].strip()}: `{val}`")
-    lines.append(f"\nReply with a number (1–{len(_EDIT_FIELDS)})")
+    lines.append(f"\n*0. Done editing* → confirm / save")
     return "\n".join(lines)
 
 
