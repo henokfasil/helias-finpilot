@@ -134,14 +134,19 @@ Now generate the SQL:"""
         # Try to extract SQL if wrapped in text
         if "SELECT" in sql_query.upper():
             start_idx = sql_query.upper().find("SELECT")
-            sql_query = sql_query[start_idx:].split("\n")[0]  # Get first line
+            sql_query = sql_query[start_idx:]
+            # Remove any trailing text after SQL ends
+            if ";" in sql_query:
+                sql_query = sql_query[:sql_query.index(";") + 1]
+
+        sql_query = sql_query.strip()
 
         # Final validation
         if not sql_query.upper().startswith("SELECT"):
             logger.error(f"Invalid SQL response: {sql_query[:80]}")
             return None
 
-        logger.info(f"✅ Generated SQL: {sql_query[:120]}")
+        logger.info(f"✅ Generated SQL: {sql_query[:150]}")
         return sql_query
 
     except Exception as e:
