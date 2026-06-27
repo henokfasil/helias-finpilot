@@ -14,21 +14,23 @@ from app.agents.chatbot import chat
 st.set_page_config(page_title="Chat · FinPilot", page_icon="💬", layout="wide")
 
 # ── Get configuration ───────────────────────────────────────────────────────
-try:
-    if "DATABASE_URL" in st.secrets:
-        db_url = st.secrets["DATABASE_URL"]
-    else:
-        from app.config import settings
-        db_url = settings.database_url
+from app.config import settings
 
-    if "GEMINI_API_KEY" in st.secrets:
-        gemini_key = st.secrets["GEMINI_API_KEY"]
-    else:
-        from app.config import settings
-        gemini_key = settings.gemini_api_key
-except Exception as e:
-    st.error(f"Configuration error: {e}")
-    st.stop()
+# Database URL
+if "DATABASE_URL" in st.secrets:
+    db_url = st.secrets["DATABASE_URL"]
+elif settings.database_url and "sqlite" not in settings.database_url:
+    # Use production database from config if available
+    db_url = settings.database_url
+else:
+    # Missing database URL - show error
+    db_url = None
+
+# Gemini API Key
+if "GEMINI_API_KEY" in st.secrets:
+    gemini_key = st.secrets["GEMINI_API_KEY"]
+else:
+    gemini_key = settings.gemini_api_key
 
 # ── Page Header ─────────────────────────────────────────────────────────────
 st.title("💬 Financial Data Chatbot")
@@ -59,7 +61,19 @@ if "selected_example" in st.session_state and st.session_state.selected_example:
         if not gemini_key:
             response = "❌ **Gemini API Key Missing**\n\nPlease add `GEMINI_API_KEY` to Streamlit Cloud Secrets."
         elif not db_url:
-            response = "❌ **Database URL Missing**\n\nPlease add `DATABASE_URL` to Streamlit Cloud Secrets."
+            response = """❌ **Database URL Missing**
+
+Please add your production database URL to Streamlit Cloud Secrets:
+
+**Option 1: PostgreSQL**
+```
+DATABASE_URL = postgresql://user:pass@host:5432/dbname
+```
+
+**Option 2: Supabase**
+```
+DATABASE_URL = postgresql://user:pass@db.supabase.co:5432/postgres
+```"""
         else:
             response = chat(prompt, company_id=company_id, db_url=db_url)
     except Exception as e:
@@ -89,7 +103,23 @@ if prompt := st.chat_input("Ask about your transactions, expenses, income..."):
             if not gemini_key:
                 response = "❌ **Gemini API Key Missing**\n\nPlease add `GEMINI_API_KEY` to Streamlit Cloud Secrets."
             elif not db_url:
-                response = "❌ **Database URL Missing**\n\nPlease add `DATABASE_URL` to Streamlit Cloud Secrets."
+                response = """❌ **Database URL Missing**
+
+Please add your production database URL to Streamlit Cloud Secrets:
+
+**Option 1: PostgreSQL (Recommended)**
+```
+DATABASE_URL = postgresql://username:password@host:5432/dbname
+```
+
+**Option 2: Supabase (Free Tier)**
+```
+DATABASE_URL = postgresql://user:password@db.xxxxx.supabase.co:5432/postgres
+```
+
+Go to your app settings → Secrets → add the DATABASE_URL above.
+
+For help getting your database URL, check the docs!"""
             else:
                 # Call chatbot
                 response = chat(prompt, company_id=company_id, db_url=db_url)
