@@ -173,13 +173,13 @@ if auto_estimate:
 
 # ── KPI Metrics ────────────────────────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("VAT on Income (15%)", f"{vat_total:,.2f} {currency}",
+k1.metric("VAT on Income (15%)", f"{vat_total:>15,.2f} {currency}",
           help="15% of sales revenue — due within 30 days")
-k2.metric("WHT on Expenses (3%)", f"{wht_total:,.2f} {currency}",
+k2.metric("WHT on Expenses (3%)", f"{wht_total:>15,.2f} {currency}",
           help="3% on payments above thresholds (20k goods, 10k services)")
 k3.metric("Exempt Transactions", f"{len(exempt_expense)}",
           help="Transport, utilities, healthcare, education, government, etc.")
-k4.metric("Total MoR Obligation", f"{total_obligation:,.2f} {currency}",
+k4.metric("Total MoR Obligation", f"{total_obligation:>15,.2f} {currency}",
           help="VAT + WHT due within 30 days of month-end")
 
 divider()
@@ -192,6 +192,9 @@ else:
     disp_income = income_df.copy()
     disp_income["date"] = disp_income["transaction_date"].dt.strftime("%Y-%m-%d")
     disp_income["source"] = disp_income["vat_amount"].apply(lambda v: "From invoice" if v > 0 else "Estimated")
+    # Format numbers with commas and 2 decimal places
+    disp_income["amount"] = disp_income["amount"].apply(lambda x: f"{x:,.2f}")
+    disp_income["vat_used"] = disp_income["vat_used"].apply(lambda x: f"{x:,.2f}")
     cols_income = ["date", "amount", "vat_used", "currency", "counterparty", "description"]
     if auto_estimate:
         cols_income.insert(3, "source")
@@ -215,6 +218,10 @@ else:
     disp_taxable["date"] = disp_taxable["transaction_date"].dt.strftime("%Y-%m-%d")
     disp_taxable["net_paid"] = disp_taxable["amount"] - disp_taxable["wht_used"]
     disp_taxable["source"] = disp_taxable["withholding_tax"].apply(lambda v: "From invoice" if v > 0 else "Estimated")
+    # Format numbers with commas and 2 decimal places
+    disp_taxable["amount"] = disp_taxable["amount"].apply(lambda x: f"{x:,.2f}")
+    disp_taxable["wht_used"] = disp_taxable["wht_used"].apply(lambda x: f"{x:,.2f}")
+    disp_taxable["net_paid"] = disp_taxable["net_paid"].apply(lambda x: f"{x:,.2f}")
     cols_taxable = ["date", "amount", "wht_used", "net_paid", "currency", "counterparty", "description"]
     if auto_estimate:
         cols_taxable.insert(3, "source")
@@ -237,6 +244,8 @@ if exempt_expense.empty:
 else:
     disp_exempt = exempt_expense.copy()
     disp_exempt["date"] = disp_exempt["transaction_date"].dt.strftime("%Y-%m-%d")
+    # Format numbers with commas and 2 decimal places
+    disp_exempt["amount"] = disp_exempt["amount"].apply(lambda x: f"{x:,.2f}")
     cols_exempt = ["date", "amount", "currency", "counterparty", "description"]
     st.dataframe(
         disp_exempt[cols_exempt].rename(columns={
