@@ -186,16 +186,29 @@ def chat(user_message: str, company_id: int = 1, db_url: str = None) -> str:
     if not db_url:
         db_url = settings.database_url
 
-    # Step 1: Generate SQL from natural language
-    sql_query = generate_sql_query(user_message, company_id)
-    if not sql_query:
-        return "I couldn't understand your question. Try asking about transactions, expenses, income, or specific counterparties."
+    try:
+        # Step 1: Generate SQL from natural language
+        logger.info(f"Processing query: {user_message[:50]}...")
+        sql_query = generate_sql_query(user_message, company_id)
 
-    # Step 2: Execute query
-    results = execute_query(sql_query, db_url)
-    if results is None:
-        return "Error querying the database. Please try again."
+        if not sql_query:
+            return "❌ I couldn't understand your question. Try being more specific:\n\n- 'Show me all expenses from last month'\n- 'What are my total expenses by category?'\n- 'Which counterparty did I spend the most on?'"
 
-    # Step 3: Format response
-    response = format_response(user_message, results)
-    return response
+        # Step 2: Execute query
+        logger.info(f"Executing SQL: {sql_query[:100]}...")
+        results = execute_query(sql_query, db_url)
+
+        if results is None:
+            return "❌ Error connecting to the database. Make sure DATABASE_URL is configured correctly in Streamlit Secrets."
+
+        if not results:
+            return f"✅ Query executed successfully, but no results found. Try a different question or date range."
+
+        # Step 3: Format response
+        logger.info(f"Formatting response with {len(results)} results...")
+        response = format_response(user_message, results)
+        return response
+
+    except Exception as e:
+        logger.error(f"Chatbot error: {e}", exc_info=True)
+        return f"⚠️ Error processing your question: {str(e)[:100]}\n\nPlease try rephrasing or check the app logs."
