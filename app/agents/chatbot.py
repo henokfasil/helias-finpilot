@@ -129,22 +129,31 @@ Now generate SQL:"""
 def execute_query(sql_query: str, db_url: str) -> Optional[list[dict]]:
     """Execute SQL query and return results as list of dicts."""
     try:
+        if not db_url:
+            logger.error("No database URL provided")
+            return None
+
+        logger.info(f"Connecting to database: {db_url[:50]}...")
         engine = create_engine(
             db_url,
             connect_args={"check_same_thread": False} if "sqlite" in db_url else {},
+            pool_pre_ping=True,  # Test connection before using
         )
         with engine.connect() as conn:
+            logger.info(f"Executing query: {sql_query[:80]}...")
             result = conn.execute(text(sql_query))
             rows = result.fetchall()
 
             if not rows:
+                logger.info("Query returned 0 rows")
                 return []
 
             columns = result.keys()
+            logger.info(f"Query returned {len(rows)} rows")
             return [dict(zip(columns, row)) for row in rows]
     except Exception as e:
-        logger.error(f"Error executing query: {e}")
-        return None
+        logger.error(f"Database error: {type(e).__name__}: {str(e)[:100]}")
+        raise
 
 
 def format_response(user_query: str, query_results: list[dict]) -> str:

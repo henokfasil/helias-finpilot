@@ -16,15 +16,17 @@ st.set_page_config(page_title="Chat · FinPilot", page_icon="💬", layout="wide
 # ── Get configuration ───────────────────────────────────────────────────────
 from app.config import settings
 
-# Database URL
+# Database URL - try multiple sources
+db_url = None
 if "DATABASE_URL" in st.secrets:
     db_url = st.secrets["DATABASE_URL"]
-elif settings.database_url and "sqlite" not in settings.database_url:
-    # Use production database from config if available
-    db_url = settings.database_url
-else:
-    # Missing database URL - show error
-    db_url = None
+
+# Debug info (will be shown if issues occur)
+debug_info = {
+    "has_secrets": "DATABASE_URL" in st.secrets,
+    "db_url_preview": db_url[:30] + "..." if db_url else "None",
+    "config_db_url": settings.database_url[:30] if settings.database_url else "None"
+}
 
 # Gemini API Key
 if "GEMINI_API_KEY" in st.secrets:
