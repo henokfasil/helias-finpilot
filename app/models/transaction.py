@@ -46,6 +46,11 @@ class Transaction(Base, TimestampMixin):
     withholding_tax: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
     is_vat_inclusive: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Payment category for WHT exemptions (per Proclamation 979/2008)
+    # Values: "government", "transport", "healthcare", "education", "utilities",
+    #         "agriculture", "fuel", "residential", "business", null (unknown)
+    counterparty_category: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+
     raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(30), default="telegram")
 

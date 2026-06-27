@@ -119,9 +119,16 @@ vat_total = income_df["vat_used"].sum() if not income_df.empty else 0
 # ── WHT Calculation with Exemptions ────────────────────────────────────────────
 def is_eligible_for_wht(row):
     """Check if expense qualifies for WHT (not exempt, above threshold)."""
-    # Check exemption first
+    # First check explicit category field (highest priority)
+    category = row.get("counterparty_category", "").lower()
+    if category in ["government", "transport", "healthcare", "education",
+                     "utilities", "agriculture", "fuel", "residential"]:
+        return False  # Exempt per Proclamation 979/2008
+
+    # Fallback to keyword matching if no category specified
     if is_exempt_from_wht(row.get("description", ""), row.get("counterparty", "")):
         return False
+
     # Check amount threshold
     return row["amount"] > WHT_THRESHOLD_SERVICES
 
