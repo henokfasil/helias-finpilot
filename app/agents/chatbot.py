@@ -64,31 +64,54 @@ def generate_sql_query(user_query: str, company_id: int = 1) -> Optional[str]:
     Returns SQL query string or None if unable to generate.
     """
     try:
-        # Simpler, more direct prompt
-        prompt = f"""Convert this to a SQL SELECT query:
+        # More specific prompt with examples for different query types
+        prompt = f"""You are a SQL expert. Convert this question to PostgreSQL:
 
 Question: "{user_query}"
 
-Database tables:
-- transactions(id, transaction_date, transaction_type, amount, currency, description, payment_method, status, category_id, counterparty_id)
-- categories(id, name, type)
-- counterparties(id, name)
+Database schema:
+- transactions: id, transaction_date, transaction_type, amount, currency, description, category_id, counterparty_id, status, company_id
+- categories: id, name, type
+- counterparties: id, name
 
-Rules:
-- Always: WHERE company_id={company_id} AND status='confirmed'
-- Join categories and counterparties if needed
-- Include LIMIT 100
-- Return ONLY the SQL (no markdown, no text)
+RULES:
+1. ALWAYS include: WHERE t.company_id={company_id} AND t.status='confirmed'
+2. Always use table aliases: t=transactions, c=categories, cp=counterparties
+3. Always use LEFT JOIN for categories and counterparties
+4. For "total/sum by category": GROUP BY c.name, SELECT c.name, SUM(t.amount) as total
+5. For "by counterparty": GROUP BY cp.name, SELECT cp.name, SUM(t.amount) as total
+6. Return ONLY valid SQL, no markdown or explanation
 
-Example for "show all transactions":
+EXAMPLES:
+
+Example 1 - "Show all transactions":
 SELECT t.id, t.transaction_date, t.amount, t.description, c.name as category, cp.name as counterparty
 FROM transactions t
 LEFT JOIN categories c ON t.category_id=c.id
 LEFT JOIN counterparties cp ON t.counterparty_id=cp.id
 WHERE t.company_id={company_id} AND t.status='confirmed'
-ORDER BY t.transaction_date DESC LIMIT 100
+ORDER BY t.transaction_date DESC
+LIMIT 100
 
-Now generate SQL:"""
+Example 2 - "Total expenses by category":
+SELECT c.name as category, SUM(t.amount) as total_amount, COUNT(*) as count
+FROM transactions t
+LEFT JOIN categories c ON t.category_id=c.id
+WHERE t.company_id={company_id} AND t.status='confirmed' AND t.transaction_type='expense'
+GROUP BY c.id, c.name
+ORDER BY total_amount DESC
+LIMIT 100
+
+Example 3 - "Spending by counterparty":
+SELECT cp.name as counterparty, SUM(t.amount) as total_spent, COUNT(*) as transaction_count
+FROM transactions t
+LEFT JOIN counterparties cp ON t.counterparty_id=cp.id
+WHERE t.company_id={company_id} AND t.status='confirmed'
+GROUP BY cp.id, cp.name
+ORDER BY total_spent DESC
+LIMIT 100
+
+Now generate the SQL:"""
 
         logger.info(f"Calling Gemini for: {user_query[:50]}")
         # Use latest flash model (free tier)
