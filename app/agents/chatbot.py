@@ -6,13 +6,13 @@ import json
 import logging
 from typing import Optional
 from datetime import datetime, timedelta
-import google.genai as genai
+import google.generativeai as genai
 from sqlalchemy import text, create_engine
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-client = genai.Client(api_key=settings.gemini_api_key)
+genai.configure(api_key=settings.gemini_api_key)
 
 
 def get_database_schema() -> str:
@@ -97,10 +97,8 @@ WHERE t.company_id = {company_id} AND t.status = 'confirmed'
 ORDER BY t.transaction_date DESC
 LIMIT 100"""
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(prompt)
         sql_query = response.text.strip()
 
         # Remove markdown code blocks if present
@@ -145,6 +143,8 @@ def format_response(user_query: str, query_results: list[dict]) -> str:
         return "No transactions found matching your criteria."
 
     try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
         # Limit results for context window
         display_results = query_results[:50]
         results_json = json.dumps(display_results, indent=2, default=str)
@@ -163,10 +163,7 @@ TASK: Generate a clear, concise, and insightful response to the user's question 
 - If there are many results (>10), summarize instead of listing all
 - Use markdown formatting for tables if helpful"""
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
+        response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         logger.error(f"Error formatting response: {e}")
