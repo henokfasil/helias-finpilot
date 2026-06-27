@@ -64,59 +64,65 @@ def generate_sql_query(user_query: str, company_id: int = 1) -> Optional[str]:
     Returns SQL query string or None if unable to generate.
     """
     try:
-        prompt = f"""You are a SQL expert for a financial transaction database.
-Your job is to convert natural language questions into correct SQL queries.
+        # Simpler, more direct prompt
+        prompt = f"""Convert this to a SQL SELECT query:
 
-{get_database_schema()}
+Question: "{user_query}"
 
-User's question: "{user_query}"
+Database tables:
+- transactions(id, transaction_date, transaction_type, amount, currency, description, payment_method, status, category_id, counterparty_id)
+- categories(id, name, type)
+- counterparties(id, name)
 
-RULES:
-1. ALWAYS return a valid SQL SELECT statement
-2. Filter by: company_id = {company_id} AND status = 'confirmed'
-3. Use proper JOINs for categories and counterparties
-4. Handle date filters (last month, last year, etc.)
-5. ALWAYS include LIMIT 1000
-6. Return ONLY the SQL query, nothing else
-7. No markdown, no backticks, no explanation
+Rules:
+- Always: WHERE company_id={company_id} AND status='confirmed'
+- Join categories and counterparties if needed
+- Include LIMIT 100
+- Return ONLY the SQL (no markdown, no text)
 
-COMMON QUESTION PATTERNS:
-- "Show me transactions from [period]" → Filter by transaction_date
-- "Total expenses/income by [field]" → Use GROUP BY and SUM
-- "[Company name]" → Filter by counterparty.name LIKE '%[name]%'
-- "How much" → Use SUM(amount)
-- "List/Show" → SELECT appropriate fields
-- "Pending" → status = 'draft' OR status = 'needs_clarification'
+Example for "show all transactions":
+SELECT t.id, t.transaction_date, t.amount, t.description, c.name as category, cp.name as counterparty
+FROM transactions t
+LEFT JOIN categories c ON t.category_id=c.id
+LEFT JOIN counterparties cp ON t.counterparty_id=cp.id
+WHERE t.company_id={company_id} AND t.status='confirmed'
+ORDER BY t.transaction_date DESC LIMIT 100
 
-EXAMPLE QUERIES:
-- Last month: WHERE transaction_date >= date('now', '-1 month')
-- By category: GROUP BY c.name, sum(amount) as total
-- Search counterparty: WHERE cp.name LIKE '%search%'
+Now generate SQL:"""
 
-Generate the SQL now:"""
-
-        model = genai.GenerativeModel("gemini-pro")
+        logger.info(f"Calling Gemini for: {user_query[:50]}")
+        # Use latest flash model (free tier)
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
         response = model.generate_content(prompt)
-        sql_query = response.text.strip()
+        sql_query = response.text.strip() if response.text else ""
+
+        logger.info(f"Gemini response: {sql_query[:100]}")
 
         # Clean up response
         if not sql_query:
             logger.warning("Empty SQL response from Gemini")
             return None
 
-        # Remove markdown code blocks if present
-        if "```" in sql_query:
-            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
+        # Remove markdown code blocks
+        for delim in ["```sql", "```", "SQL"]:
+            sql_query = sql_query.replace(delim, "")
+        sql_query = sql_query.strip()
 
-        # Validate it looks like SQL
+        # Try to extract SQL if wrapped in text
+        if "SELECT" in sql_query.upper():
+            start_idx = sql_query.upper().find("SELECT")
+            sql_query = sql_query[start_idx:].split("\n")[0]  # Get first line
+
+        # Final validation
         if not sql_query.upper().startswith("SELECT"):
-            logger.warning(f"Response doesn't start with SELECT: {sql_query[:50]}")
+            logger.error(f"Invalid SQL response: {sql_query[:80]}")
             return None
 
-        logger.info(f"Generated SQL: {sql_query[:150]}...")
+        logger.info(f"✅ Generated SQL: {sql_query[:120]}")
         return sql_query
+
     except Exception as e:
-        logger.error(f"Error generating SQL: {e}")
+        logger.error(f"SQL generation error: {type(e).__name__}: {str(e)}")
         return None
 
 
