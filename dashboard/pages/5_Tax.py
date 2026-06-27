@@ -37,14 +37,33 @@ WHT_THRESHOLD_SERVICES = 10_000  # ETB
 
 # Keyword-based exemptions per Proclamation 979/2008, Section 3.3.6
 WHT_EXEMPT_KEYWORDS = [
+    # Government Institutions (exempt per Section 3.3.6)
+    "dars", "dire", "addis", "government", "federal", "regional", "ministry", "authority",
+    "revenue", "customs", "immigration", "police", "defense", "parliament", "senate",
+    "council", "office", "public", "state", "administration", "agency",
+
+    # Transport (exempt per Section 3.3.6)
     "fly", "flight", "air", "airline", "aviation", "plane", "aircraft",
     "train", "railway", "bus", "coach", "transport", "travel", "tour", "ticket",
+
+    # Utilities (exempt per Section 3.3.6)
     "electricity", "electric", "power", "telecom", "phone", "water", "utility",
+
+    # Healthcare (exempt per Section 3.3.6)
     "hospital", "clinic", "medical", "doctor", "pharma", "medicine", "vaccine", "health",
-    "school", "university", "college", "education", "training", "course",
-    "government", "federal", "regional", "ministry", "office", "public",
-    "farm", "farmer", "agricultural", "crop", "livestock", "dairy",
-    "fuel", "petrol", "diesel", "gas",
+    "lab", "laboratory", "nurse", "dentist", "dental",
+
+    # Education (exempt per Section 3.3.6)
+    "school", "university", "college", "education", "training", "course", "academy",
+
+    # Agriculture (exempt per Section 3.3.6)
+    "farm", "farmer", "agricultural", "crop", "livestock", "dairy", "pastoral",
+
+    # Fuel (exempt per Section 3.3.6)
+    "fuel", "petrol", "diesel", "gas", "gasoline",
+
+    # Residential (exempt per Section 3.3.6)
+    "residential", "housing", "rent", "apartment", "house", "dwelling", "home",
 ]
 
 def is_exempt_from_wht(description, counterparty):
