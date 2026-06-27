@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     openai_model: str = Field("gpt-4o-mini", env="OPENAI_MODEL")
     openai_vision_model: str = Field("gpt-4o", env="OPENAI_VISION_MODEL")
 
-    # Gemini — used for image/document extraction (better Amharic support)
+    # Gemini — used for chatbot and image/document extraction
     gemini_api_key: str = Field("", env="GEMINI_API_KEY")
-    gemini_vision_model: str = Field("gemini-2.0-flash", env="GEMINI_VISION_MODEL")
+    gemini_vision_model: str = Field("gemini-1.5-flash", env="GEMINI_VISION_MODEL")
 
     # Database
     database_url: str = Field("sqlite:///./finpilot.db", env="DATABASE_URL")

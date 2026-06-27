@@ -95,7 +95,7 @@ EXAMPLE QUERIES:
 
 Generate the SQL now:"""
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(prompt)
         sql_query = response.text.strip()
 
@@ -149,7 +149,7 @@ def format_response(user_query: str, query_results: list[dict]) -> str:
         return "No transactions found matching your criteria."
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-pro")
 
         # Limit results for context window
         display_results = query_results[:50]
