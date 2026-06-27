@@ -144,37 +144,67 @@ def execute_query(sql_query: str, db_url: str) -> Optional[list[dict]]:
 def format_response(user_query: str, query_results: list[dict]) -> str:
     """
     Use Gemini to format query results into a natural, readable response.
+    Falls back to simple formatting if Gemini fails.
     """
     if not query_results:
-        return "No transactions found matching your criteria."
+        return "✅ No transactions found matching your criteria."
 
     try:
         model = genai.GenerativeModel("gemini-pro")
 
-        # Limit results for context window
-        display_results = query_results[:50]
+        # Limit results for context and speed
+        display_results = query_results[:20]  # Reduced from 50
         results_json = json.dumps(display_results, indent=2, default=str)
 
-        prompt = f"""You are a financial analyst assistant.
+        prompt = f"""Summarize these financial query results in 3-5 sentences:
 
-User's question: "{user_query}"
+Question: {user_query}
 
-Database query results:
-{results_json}
+Results: {results_json}
 
-TASK: Generate a clear, concise, and insightful response to the user's question based on these results.
-- Highlight key numbers and trends
-- Use currency amounts in a readable format
-- Keep response under 200 words
-- If there are many results (>10), summarize instead of listing all
-- Use markdown formatting for tables if helpful"""
+Be concise and highlight key numbers."""
 
-        response = model.generate_content(prompt)
-        return response.text
+        # Set timeout implicitly through smaller prompt
+        response = model.generate_content(prompt, safety_settings=[
+            {"category": "HARM_CATEGORY_UNSPECIFIED", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ])
+        if response.text:
+            return response.text
+        else:
+            return _simple_format(query_results)
     except Exception as e:
         logger.error(f"Error formatting response: {e}")
-        # Fallback: format as simple table
-        return f"Found {len(query_results)} results:\n\n" + str(query_results[:5])
+        return _simple_format(query_results)
+
+
+def _simple_format(results: list[dict]) -> str:
+    """Simple fallback formatting without Gemini."""
+    if not results:
+        return "✅ Query completed with no results."
+
+    # Simple summary
+    if len(results) > 10:
+        return f"✅ Found {len(results)} transactions. Showing first 10:\n\n{_format_table(results[:10])}"
+    else:
+        return f"✅ Found {len(results)} transaction(s):\n\n{_format_table(results)}"
+
+
+def _format_table(results: list[dict]) -> str:
+    """Format results as a simple markdown table."""
+    if not results:
+        return "No data"
+
+    # Get first row's keys as headers
+    headers = list(results[0].keys())[:5]  # Limit to 5 columns
+    lines = ["|" + "|".join(headers) + "|"]
+    lines.append("|" + "|".join(["---"] * len(headers)) + "|")
+
+    for row in results[:10]:
+        values = [str(row.get(h, ""))[:30] for h in headers]
+        lines.append("|" + "|".join(values) + "|")
+
+    return "\n".join(lines)
 
 
 def chat(user_message: str, company_id: int = 1, db_url: str = None) -> str:
