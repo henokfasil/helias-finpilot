@@ -65,49 +65,55 @@ def generate_sql_query(user_query: str, company_id: int = 1) -> Optional[str]:
     """
     try:
         prompt = f"""You are a SQL expert for a financial transaction database.
+Your job is to convert natural language questions into correct SQL queries.
 
 {get_database_schema()}
 
-User's natural language query: "{user_query}"
+User's question: "{user_query}"
 
-TASK: Convert this query to a SQL SELECT statement that:
-1. Filters by company_id = {company_id}
-2. Only includes 'confirmed' transactions (status = 'confirmed')
-3. Joins with categories and counterparties tables as needed
-4. Returns relevant fields
-5. Orders results meaningfully (usually by transaction_date DESC)
+RULES:
+1. ALWAYS return a valid SQL SELECT statement
+2. Filter by: company_id = {company_id} AND status = 'confirmed'
+3. Use proper JOINs for categories and counterparties
+4. Handle date filters (last month, last year, etc.)
+5. ALWAYS include LIMIT 1000
+6. Return ONLY the SQL query, nothing else
+7. No markdown, no backticks, no explanation
 
-IMPORTANT:
-- Return ONLY valid SQL, no explanation
-- Use snake_case for column names
-- Use single quotes for string literals
-- Include JOINs as needed
-- Limit to 1000 rows
+COMMON QUESTION PATTERNS:
+- "Show me transactions from [period]" → Filter by transaction_date
+- "Total expenses/income by [field]" → Use GROUP BY and SUM
+- "[Company name]" → Filter by counterparty.name LIKE '%[name]%'
+- "How much" → Use SUM(amount)
+- "List/Show" → SELECT appropriate fields
+- "Pending" → status = 'draft' OR status = 'needs_clarification'
 
-If the query is about transactions, make sure to JOIN:
-LEFT JOIN categories c ON t.category_id = c.id
-LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
+EXAMPLE QUERIES:
+- Last month: WHERE transaction_date >= date('now', '-1 month')
+- By category: GROUP BY c.name, sum(amount) as total
+- Search counterparty: WHERE cp.name LIKE '%search%'
 
-Example output format:
-SELECT t.id, t.transaction_date, t.amount, t.description, c.name as category, cp.name as counterparty
-FROM transactions t
-LEFT JOIN categories c ON t.category_id = c.id
-LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
-WHERE t.company_id = {company_id} AND t.status = 'confirmed'
-ORDER BY t.transaction_date DESC
-LIMIT 100"""
+Generate the SQL now:"""
 
         model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(prompt)
         sql_query = response.text.strip()
 
-        # Remove markdown code blocks if present
-        if sql_query.startswith("```"):
-            sql_query = sql_query.split("\n", 1)[1]
-        if sql_query.endswith("```"):
-            sql_query = sql_query.rsplit("\n", 1)[0]
+        # Clean up response
+        if not sql_query:
+            logger.warning("Empty SQL response from Gemini")
+            return None
 
-        logger.info(f"Generated SQL: {sql_query}")
+        # Remove markdown code blocks if present
+        if "```" in sql_query:
+            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
+
+        # Validate it looks like SQL
+        if not sql_query.upper().startswith("SELECT"):
+            logger.warning(f"Response doesn't start with SELECT: {sql_query[:50]}")
+            return None
+
+        logger.info(f"Generated SQL: {sql_query[:150]}...")
         return sql_query
     except Exception as e:
         logger.error(f"Error generating SQL: {e}")
