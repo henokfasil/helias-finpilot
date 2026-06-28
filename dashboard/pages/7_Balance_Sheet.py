@@ -132,7 +132,7 @@ with col2:
         st.markdown(f"**VAT Payable (15%)** &nbsp;&nbsp;&nbsp; `{vat_payable:,.2f} {currency}`")
         st.caption("↳ Remit to Ministry of Revenue")
     if wht_payable > 0:
-        st.markdown(f"**WHT Payable (2%)** &nbsp;&nbsp;&nbsp; `{wht_payable:,.2f} {currency}`")
+        st.markdown(f"**WHT Payable (3%)** &nbsp;&nbsp;&nbsp; `{wht_payable:,.2f} {currency}`")
         st.caption("↳ Remit to Ministry of Revenue")
     for s in liability_snaps:
         st.markdown(f"**{s['name']}** &nbsp;&nbsp;&nbsp; `{s['amount']:,.2f} {currency}`")

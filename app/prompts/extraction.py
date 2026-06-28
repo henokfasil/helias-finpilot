@@ -62,7 +62,7 @@ ETHIOPIAN TAX RULES (apply automatically):
   * If the document says "VAT inclusive" or "including VAT" on an income transaction, set is_vat_inclusive=true and compute vat_amount = amount * 15/115.
   * Set is_tax_relevant=true for any income transaction (VAT registered businesses must remit 15% of sales to MoR).
   * Do NOT set vat_amount for EXPENSE transactions.
-- Withholding Tax (WHT): 2% on EXPENSE payments to suppliers, but ONLY if the expense amount exceeds 10,000 ETB.
+- Withholding Tax (WHT): 3% on EXPENSE payments to suppliers, but ONLY if the expense amount exceeds 10,000 ETB.
   * If the expense amount > 10,000 ETB and the document shows a withholding deduction ("ምዝገባ ቀረጥ" or "withholding"), extract as withholding_tax.
   * If the expense amount > 10,000 ETB and no WHT is shown, compute withholding_tax = amount * 0.02.
   * If the expense amount is 10,000 ETB or less, set withholding_tax = null (WHT does not apply).

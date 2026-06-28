@@ -17,7 +17,7 @@ Computes the three core financial statements from transaction data:
 Ethiopian context:
   - Default currency: ETB
   - VAT (15%) on income is a liability (to remit to MoR)
-  - WHT (2%) on expenses > 10,000 ETB is also a liability (to remit to MoR)
+  - WHT (3%) on expenses > 10,000 ETB is also a liability (to remit to MoR)
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def income_statement(
       expenses_detail  — list of {category, amount} sorted desc
       gross_profit     — revenue - expenses (operating net)
       vat_on_income    — 15% VAT obligation on income
-      wht_on_expenses  — 2% WHT on expenses > 10,000 ETB
+      wht_on_expenses  — 3% WHT on expenses (goods > 20,000 ETB, services > 10,000 ETB)
       net_profit       — gross_profit (tax figures are shown separately for MoR)
     """
     q = db.query(Transaction).filter(

@@ -47,7 +47,7 @@ def format_extraction_preview(ex: ExtractedTransaction) -> str:
         vat_label = "VAT (output — to remit)" if ex.transaction_type == "income" else "VAT (input — credit)"
         lines.append(f"🧾 {vat_label}: `{ex.vat_amount:,.2f} {ex.currency or 'ETB'}`")
     if ex.withholding_tax:
-        lines.append(f"🏦 Withholding Tax (2%): `{ex.withholding_tax:,.2f} {ex.currency or 'ETB'}`")
+        lines.append(f"🏦 Withholding Tax (3%): `{ex.withholding_tax:,.2f} {ex.currency or 'ETB'}`")
     if ex.is_vat_inclusive:
         lines.append("ℹ️ _Amount is VAT-inclusive_")
 

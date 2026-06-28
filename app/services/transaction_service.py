@@ -265,7 +265,7 @@ def tax_summary(db: Session, company_id: int, year: int, month: Optional[int] = 
 
     Ethiopian law:
     - VAT (15%): on INCOME only — businesses remit 15% of sales revenue to MoR
-    - WHT (2%):  on EXPENSE payments > 10,000 ETB only — withheld from supplier payment
+    - WHT (3%):  on EXPENSE payments > 10,000 ETB only — withheld from supplier payment (goods > 20k, services > 10k)
     """
     q = db.query(Transaction).filter(
         Transaction.company_id == company_id,

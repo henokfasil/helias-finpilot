@@ -105,7 +105,7 @@ with col_left:
         "|  |  |",
         "| **TAX OBLIGATIONS** (separate, remit to MoR) | |",
         _row("VAT Payable (15% of income)", vat_obligation, indent=True),
-        _row("WHT Payable (2% on exp. > 10k)", wht_obligation, indent=True),
+        _row("WHT Payable (3% on exp. > 10k)", wht_obligation, indent=True),
         "|  |  |",
         _row("NET PROFIT / (LOSS)", net_profit, bold=True),
     ]

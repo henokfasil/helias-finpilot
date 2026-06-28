@@ -543,7 +543,7 @@ async def cmd_tax_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         f"*VAT (15%) — on income only*",
         f"  VAT on sales/income:     `{tax['vat_on_income']:>12,.2f} {currency}`",
         "",
-        f"*WHT (2%) — expenses > 10,000 ETB only*",
+        f"*WHT (3%) — expenses > 10,000 ETB only*",
         f"  WHT on large expenses:   `{tax['wht_on_expenses']:>12,.2f} {currency}`",
         "",
         f"  ────────────────────────────────────",
@@ -1024,7 +1024,7 @@ async def cmd_income_statement(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -
         "",
         f"*TAX OBLIGATIONS (separate — remit to MoR)*",
         f"  VAT Payable (15%):   `{stmt['vat_on_income']:>12,.2f} {currency}`",
-        f"  WHT Payable (2%):    `{stmt['wht_on_expenses']:>12,.2f} {currency}`",
+        f"  WHT Payable (3%):    `{stmt['wht_on_expenses']:>12,.2f} {currency}`",
         "",
         f"  ────────────────────────────────────",
         f"*NET PROFIT:    `{stmt['net_profit']:>11,.2f} {currency}`*",
@@ -1074,7 +1074,7 @@ async def cmd_balance_sheet(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
         "",
         f"*LIABILITIES*",
         f"  VAT Payable (15%): `{bs['liabilities']['vat_payable']:>10,.2f} {currency}`",
-        f"  WHT Payable (2%):  `{bs['liabilities']['wht_payable']:>10,.2f} {currency}`",
+        f"  WHT Payable (3%):  `{bs['liabilities']['wht_payable']:>10,.2f} {currency}`",
     ]
     for item in bs["liabilities"]["manual_items"]:
         lines.append(f"  {item['name'][:22]:<22} `{item['amount']:>8,.2f}`")
