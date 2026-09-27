@@ -29,15 +29,33 @@ from sqlalchemy import create_engine, text
 from app.config import settings
 
 
+def _normalize_pg_url(url: str) -> str:
+    """
+    Force the psycopg v3 driver for PostgreSQL URLs.
+
+    We ship psycopg[binary] (v3), not psycopg2, because v3 has wheels for the
+    Python 3.14 runtime used by Streamlit Cloud. Rewrite any bare/psycopg2
+    Postgres scheme to postgresql+psycopg:// so SQLAlchemy loads the v3 dialect.
+    """
+    if url.startswith("postgresql+psycopg2://"):
+        return "postgresql+psycopg://" + url[len("postgresql+psycopg2://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
+
+
 def _get_database_url() -> str:
     """
     Prefer Streamlit Cloud secrets, fall back to .env / default.
     On Streamlit Cloud, secrets are injected via st.secrets.
     """
     try:
-        return st.secrets["DATABASE_URL"]
+        url = st.secrets["DATABASE_URL"]
     except (KeyError, FileNotFoundError):
-        return settings.database_url
+        url = settings.database_url
+    return _normalize_pg_url(url)
 
 
 @st.cache_resource

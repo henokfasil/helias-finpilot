@@ -40,4 +40,6 @@ plotly>=5.20.0
 pandas>=2.2.0
 
 # PostgreSQL (for Supabase / production)
-psycopg2-binary>=2.9.9
+# psycopg v3 — has wheels for Python 3.14 (Streamlit Cloud) and is the
+# actively-maintained driver. URLs are normalized to postgresql+psycopg:// in code.
+psycopg[binary]>=3.2.0

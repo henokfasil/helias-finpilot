@@ -8,14 +8,33 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_pg_url(url: str) -> str:
+    """
+    Force the psycopg v3 driver for PostgreSQL URLs.
+
+    We ship psycopg[binary] (v3), not psycopg2, so rewrite any bare/psycopg2
+    Postgres scheme to postgresql+psycopg:// for SQLAlchemy's v3 dialect.
+    """
+    if url.startswith("postgresql+psycopg2://"):
+        return "postgresql+psycopg://" + url[len("postgresql+psycopg2://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
+
+
+DATABASE_URL = _normalize_pg_url(settings.database_url)
+
 # Handle SQLite-specific pragmas for WAL mode and FK enforcement
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
     echo=(settings.app_env == "development"),
 )
 
-if "sqlite" in settings.database_url:
+if "sqlite" in DATABASE_URL:
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
