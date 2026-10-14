@@ -22,18 +22,30 @@ import streamlit as st
 
 from dashboard.db import load_financial_data, load_account_snapshots, load_company
 
-st.set_page_config(page_title="Balance Sheet", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Balance Sheet · FinPilot", page_icon="⚖️", layout="wide")
 st.title("⚖️ Balance Sheet")
 st.caption("Statement of Financial Position — Assets = Liabilities + Equity")
 
 company = load_company()
 currency = company.get("base_currency", "ETB")
-company_name = company.get("name", "Your Company")
+company_name = company.get("name", "Helias AI and Analytics PLC")
+
+def et_fy_end(fy: int) -> "pd.Timestamp":
+    """Return the last day of Ethiopian FY (7 July of the following Gregorian year)."""
+    return pd.Timestamp(fy + 2008, 7, 7).date()
 
 # ── Sidebar: as-of date ───────────────────────────────────────────────────────
 with st.sidebar:
     st.header("As of Date")
-    as_of = st.date_input("Balance Sheet date", value=pd.Timestamp.now().date())
+    fy_options = {f"FY{y} E.C.  (end 7 Jul {y+2008})": et_fy_end(y)
+                  for y in range(2015, 2025)}
+    fy_options["Custom date"] = None
+    choice = st.selectbox("Ethiopian FY", list(fy_options.keys()), index=len(fy_options)-3)
+    if fy_options[choice] is not None:
+        as_of = fy_options[choice]
+        st.caption(f"As of {as_of}")
+    else:
+        as_of = st.date_input("Custom date", value=pd.Timestamp.now().date())
     st.info(
         "**How it works**\n\n"
         "Cash is computed from all confirmed transactions up to the selected date.\n\n"
@@ -202,6 +214,17 @@ with col_chart2:
         fig2.update_traces(textinfo="label+percent")
         fig2.update_layout(showlegend=False, height=300)
         st.plotly_chart(fig2, use_container_width=True)
+
+# ── Download Excel report ────────────────────────────────────────────────────
+st.divider()
+fy_key = choice.split()[0].replace("FY","") if "FY" in choice else None
+if fy_key:
+    rpt = Path(__file__).parent.parent.parent / "reports" / f"fy{fy_key}" / \
+          f"Helias_FY{fy_key}_Financial_Report_ETB.xlsx"
+    if rpt.exists():
+        st.download_button(f"⬇️  Download FY{fy_key} Excel Report", rpt.read_bytes(),
+                           file_name=rpt.name,
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ── Add manual items note ─────────────────────────────────────────────────────
 st.divider()

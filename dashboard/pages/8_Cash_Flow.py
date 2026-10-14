@@ -26,10 +26,21 @@ currency = company.get("base_currency", "ETB")
 company_name = company.get("name", "Your Company")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
+def et_fy(date: "pd.Timestamp") -> int:
+    return date.year - 2007 if date.month >= 7 else date.year - 2008
+
 with st.sidebar:
     st.header("Period")
-    year = st.selectbox("Year", list(range(2023, 2030)),
-                        index=list(range(2023, 2030)).index(2026))
+    _df_all = load_financial_data()
+    if not _df_all.empty:
+        _avail = sorted(_df_all["transaction_date"].apply(et_fy).dropna().unique().astype(int), reverse=True)
+    else:
+        _avail = [2018]
+    fy_sel = st.selectbox("Ethiopian FY",  _avail,
+                          format_func=lambda y: f"FY{y} E.C.  ({y+2007}/07/08–{y+2008}/07/07)")
+    # Gregorian year range for the selected FY
+    fy_start = pd.Timestamp(fy_sel + 2007, 7, 8).date()
+    fy_end   = pd.Timestamp(fy_sel + 2008, 7, 7).date()
     view = st.radio("View", ["Annual", "Monthly"])
     month = None
     if view == "Monthly":
@@ -56,11 +67,12 @@ if df.empty:
     st.info("No confirmed transactions yet.")
     st.stop()
 
-df = df[df["transaction_date"].dt.year == year]
+df["_et_fy"] = df["transaction_date"].apply(et_fy)
+df = df[df["_et_fy"] == fy_sel]
 if month:
     df = df[df["transaction_date"].dt.month == month]
 
-period_label = f"{year}" if not month else pd.Timestamp(year, month, 1).strftime("%B %Y")
+period_label = f"FY{fy_sel} E.C." if not month else pd.Timestamp(fy_sel+2007, month, 1).strftime("%B %Y")
 
 # ── Compute by activity ──────────────────────────────────────────────────────
 def _compute_activity(sub_df: pd.DataFrame) -> dict:

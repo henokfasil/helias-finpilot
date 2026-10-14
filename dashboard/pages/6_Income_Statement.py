@@ -1,5 +1,6 @@
 """
 Income Statement (Profit & Loss) — Helias FinPilot Dashboard
+Ethiopian Fiscal Year aware: Hamle 1 (≈8 Jul) → Sene 30 (≈7 Jul)
 """
 import sys
 from pathlib import Path
@@ -10,209 +11,191 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.db import load_financial_data, load_company
+from dashboard.components import page_header
 
-st.set_page_config(page_title="Income Statement", page_icon="📊", layout="wide")
-st.title("📊 Income Statement (Profit & Loss)")
+st.set_page_config(page_title="Income Statement · FinPilot", page_icon="📊", layout="wide")
 
-company = load_company()
-currency = company.get("base_currency", "ETB")
-company_name = company.get("name", "Your Company")
+# ── Ethiopian FY helpers ──────────────────────────────────────────────────────
+def et_fy(date: pd.Timestamp) -> int:
+    """Return Ethiopian fiscal year (e.g. 2018) for a Gregorian date."""
+    return date.year - 2007 if date.month >= 7 else date.year - 2008
 
-# ── Sidebar controls ──────────────────────────────────────────────────────────
-with st.sidebar:
-    st.header("Period")
-    all_years = list(range(2023, 2030))
-    year = st.selectbox("Year", all_years, index=all_years.index(2026) if 2026 in all_years else 0)
-    view = st.radio("View", ["Annual", "Monthly"])
-    month = None
-    if view == "Monthly":
-        month = st.selectbox(
-            "Month",
-            range(1, 13),
-            format_func=lambda m: pd.Timestamp(2026, m, 1).strftime("%B"),
-            index=pd.Timestamp.now().month - 1,
-        )
+def fy_label(fy: int) -> str:
+    return f"FY{fy} E.C.  ({fy + 2007}/07/08 – {fy + 2008}/07/07)"
 
-# ── Load data ────────────────────────────────────────────────────────────────
-df = load_financial_data()
+# ── Company & data ────────────────────────────────────────────────────────────
+company      = load_company()
+currency     = company.get("base_currency", "ETB") if company else "ETB"
+company_name = company.get("name", "Helias AI and Analytics PLC") if company else "Helias AI and Analytics PLC"
 
-if df.empty:
-    st.info("No confirmed transactions yet. Confirm some transactions in the bot first.")
+page_header("Income Statement", "Profit & Loss — Ethiopian Fiscal Year")
+
+df_all = load_financial_data()
+
+if df_all.empty:
+    st.info("No confirmed transactions yet.")
     st.stop()
 
-# Filter by period
-df = df[df["transaction_date"].dt.year == year]
-if month:
-    df = df[df["transaction_date"].dt.month == month]
+df_all["et_fy"] = df_all["transaction_date"].apply(et_fy)
 
-income_df = df[df["transaction_type"] == "income"]
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("Period")
+    available_fy = sorted(df_all["et_fy"].dropna().unique().astype(int), reverse=True)
+    fy = st.selectbox("Ethiopian Fiscal Year", available_fy,
+                      format_func=fy_label, index=0)
+    view = st.radio("View", ["Annual", "Monthly breakdown"])
+
+# ── Filter ────────────────────────────────────────────────────────────────────
+df = df_all[df_all["et_fy"] == fy].copy()
+
+# Exclude financing transfers from P&L
+df = df[df["activity_type"].isin(["operating", "investing"]) &
+        df["transaction_type"].isin(["income", "expense"])]
+
+income_df  = df[df["transaction_type"] == "income"]
 expense_df = df[df["transaction_type"] == "expense"]
 
-revenue = income_df["amount"].sum()
-expenses = expense_df["amount"].sum()
-gross_profit = revenue - expenses
-vat_obligation = income_df["vat_amount"].sum()
-wht_obligation = expense_df[expense_df["amount"] > 10000]["withholding_tax"].sum()
-net_profit = gross_profit  # tax is separate obligation, not deducted from ops
+revenue   = income_df["amount"].sum()
+expenses  = expense_df["amount"].sum()
 
-period_label = f"{year}" if not month else pd.Timestamp(year, month, 1).strftime("%B %Y")
+# Depreciation allowance (20% pool on equipment) — Ethiopian pool method
+equip_cost = expense_df[
+    expense_df["description"].str.contains("laptop|device|furniture|equip|computer",
+                                            case=False, na=False)
+]["amount"].sum()
+depreciation = round(equip_cost * 0.20, 2)
+
+# Adjust: remove equipment CAPEX from opex if tagged as investing
+capex_df = df[df["activity_type"] == "investing"]
+opex_df  = expense_df[expense_df["activity_type"] == "operating"]
+opex     = opex_df["amount"].sum()
+
+pbt       = revenue - opex - depreciation
+tax_gross = round(max(pbt, 0) * 0.30, 2)
+wht_credit = income_df["withholding_tax"].sum()
+tax_net   = round(max(tax_gross - wht_credit, 0), 2)
+npat      = round(pbt - tax_gross, 2)
 
 # ── KPI strip ─────────────────────────────────────────────────────────────────
-st.subheader(f"{company_name} — {period_label}")
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("💰 Revenue", f"{revenue:,.0f} {currency}")
-col2.metric("💸 Total Expenses", f"{expenses:,.0f} {currency}", delta=f"{-expenses:,.0f}")
-col3.metric(
-    "📈 Net Profit / Loss",
-    f"{net_profit:,.0f} {currency}",
-    delta=f"{net_profit:,.0f}",
-    delta_color="normal",
-)
-col4.metric("📉 Profit Margin", f"{(net_profit/revenue*100):.1f}%" if revenue > 0 else "—")
+st.subheader(f"{company_name}  —  {fy_label(fy)}")
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Revenue",        f"{revenue:,.0f} {currency}")
+c2.metric("Expenses",       f"{opex + depreciation:,.0f} {currency}")
+c3.metric("Profit (pre-tax)", f"{pbt:,.0f} {currency}")
+c4.metric("Tax to pay",     f"{tax_net:,.0f} {currency}",
+          help="30% on taxable profit − WHT credit")
+c5.metric("Net profit",     f"{npat:,.0f} {currency}",
+          delta=f"{npat/revenue*100:.1f}% margin" if revenue else "—")
 
 st.divider()
 
-# ── Formal P&L Table ─────────────────────────────────────────────────────────
+# ── Formal P&L table ──────────────────────────────────────────────────────────
 col_left, col_right = st.columns([1, 1])
 
 with col_left:
     st.subheader("Formal Statement")
 
     def _row(label, amount, bold=False, indent=False):
-        prefix = "  " if indent else ""
+        p = "  " if indent else ""
         if bold:
-            return f"| **{prefix}{label}** | **{amount:,.2f}** |"
-        return f"| {prefix}{label} | {amount:,.2f} |"
+            return f"| **{p}{label}** | **{amount:,.2f}** |"
+        return f"| {p}{label} | {amount:,.2f} |"
 
     lines = [
-        "| Item | Amount ({}) |".format(currency),
-        "|---|---:|",
+        f"| Item | {currency} |", "|---|---:|",
         _row("REVENUE", revenue, bold=True),
-        _row("Sales / Service Income", revenue, indent=True),
-        "|  |  |",
-        _row("OPERATING EXPENSES", expenses, bold=True),
     ]
-
-    # Expenses by category
-    if not expense_df.empty:
-        for cat, grp in expense_df.groupby("category"):
-            cat_name = cat if cat else "Uncategorised"
-            lines.append(_row(cat_name, grp["amount"].sum(), indent=True))
-
+    for _, r in income_df.iterrows():
+        lines.append(_row(r.get("counterparty") or r.get("description", "—")[:40],
+                          r["amount"], indent=True))
+    lines += ["|  |  |", _row("OPERATING EXPENSES", opex + depreciation, bold=True)]
+    if not opex_df.empty:
+        for cat, grp in opex_df.groupby("category"):
+            lines.append(_row(cat or "Uncategorised", grp["amount"].sum(), indent=True))
+    lines.append(_row("Depreciation — equipment (20% pool)", depreciation, indent=True))
     lines += [
         "|  |  |",
-        _row("GROSS PROFIT / (LOSS)", gross_profit, bold=True),
+        _row("NET PROFIT BEFORE TAX", pbt, bold=True),
+        _row("Income tax expense  (@30%)", -tax_gross, indent=True),
+        _row("  Less: WHT credit (withheld by clients)", -wht_credit, indent=True),
         "|  |  |",
-        "| **TAX OBLIGATIONS** (separate, remit to MoR) | |",
-        _row("VAT Payable (15% of income)", vat_obligation, indent=True),
-        _row("WHT Payable (3% on exp. > 10k)", wht_obligation, indent=True),
-        "|  |  |",
-        _row("NET PROFIT / (LOSS)", net_profit, bold=True),
+        _row("NET PROFIT AFTER TAX", npat, bold=True),
     ]
-
     st.markdown("\n".join(lines))
 
 with col_right:
-    # Waterfall chart
     st.subheader("Waterfall")
-
-    # Expense breakdown for chart
-    expense_cats = (
-        expense_df.groupby("category")["amount"].sum().sort_values(ascending=False)
-        if not expense_df.empty
-        else pd.Series(dtype=float)
-    )
-
-    x_labels = ["Revenue"] + [c if c else "Uncategorised" for c in expense_cats.index] + ["Net Profit"]
-    measure = ["absolute"] + ["relative"] * len(expense_cats) + ["total"]
-    values = [revenue] + [-v for v in expense_cats.values] + [net_profit]
-    colors = ["#2ecc71"] + ["#e74c3c"] * len(expense_cats) + (["#2ecc71"] if net_profit >= 0 else ["#e74c3c"])
-
+    cats = opex_df.groupby("category")["amount"].sum().sort_values(ascending=False)
+    x  = ["Revenue"] + [c or "Other" for c in cats.index] + ["Depreciation"] + ["Net Profit"]
+    m  = ["absolute"] + ["relative"] * len(cats) + ["relative"] + ["total"]
+    y  = [revenue] + [-v for v in cats.values] + [-depreciation] + [npat]
     fig = go.Figure(go.Waterfall(
-        name="P&L",
-        orientation="v",
-        measure=measure,
-        x=x_labels,
-        y=values,
-        connector={"line": {"color": "rgb(63, 63, 63)"}},
-        increasing={"marker": {"color": "#2ecc71"}},
+        orientation="v", measure=m, x=x, y=y,
+        connector={"line": {"color": "#aaa"}},
+        increasing={"marker": {"color": "#27ae60"}},
         decreasing={"marker": {"color": "#e74c3c"}},
-        totals={"marker": {"color": "#3498db"}},
+        totals={"marker": {"color": "#2980b9"}},
     ))
-    fig.update_layout(
-        title=f"P&L Waterfall — {period_label}",
-        yaxis_title=currency,
-        showlegend=False,
-        height=450,
-    )
+    fig.update_layout(title=fy_label(fy), yaxis_title=currency,
+                      showlegend=False, height=460)
     st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# ── Monthly trend (annual view only) ─────────────────────────────────────────
-if not month and not df.empty:
-    st.subheader("Monthly Trend")
-    monthly = (
-        df.groupby([df["transaction_date"].dt.month, "transaction_type"])["amount"]
-        .sum()
-        .unstack(fill_value=0)
-        .reset_index()
-        .rename(columns={"transaction_date": "month"})
-    )
-    monthly["month_label"] = monthly["month"].apply(
-        lambda m: pd.Timestamp(year, int(m), 1).strftime("%b")
-    )
+# ── Monthly breakdown ─────────────────────────────────────────────────────────
+if view == "Monthly breakdown" and not df.empty:
+    st.subheader("Monthly Breakdown")
+    monthly = (df.groupby([df["transaction_date"].dt.to_period("M"), "transaction_type"])
+               ["amount"].sum().unstack(fill_value=0).reset_index())
+    monthly["month"] = monthly["transaction_date"].astype(str)
     fig2 = go.Figure()
     if "income" in monthly.columns:
-        fig2.add_trace(go.Bar(name="Income", x=monthly["month_label"], y=monthly["income"],
-                              marker_color="#2ecc71"))
+        fig2.add_trace(go.Bar(name="Income", x=monthly["month"],
+                              y=monthly["income"], marker_color="#27ae60"))
     if "expense" in monthly.columns:
-        fig2.add_trace(go.Bar(name="Expenses", x=monthly["month_label"], y=monthly["expense"],
-                              marker_color="#e74c3c"))
-    net_by_month = monthly.get("income", 0) - monthly.get("expense", 0)
-    fig2.add_trace(go.Scatter(name="Net Profit", x=monthly["month_label"], y=net_by_month,
-                               mode="lines+markers", line=dict(color="#3498db", width=2)))
-    fig2.update_layout(barmode="group", height=350, yaxis_title=currency)
+        fig2.add_trace(go.Bar(name="Expenses", x=monthly["month"],
+                              y=monthly["expense"], marker_color="#e74c3c"))
+    fig2.update_layout(barmode="group", height=340, yaxis_title=currency)
     st.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
 
-# ── Transaction detail tables ────────────────────────────────────────────────
-col_a, col_b = st.columns(2)
-with col_a:
-    st.subheader(f"Income ({len(income_df)} transactions)")
+# ── Detail tables ─────────────────────────────────────────────────────────────
+ca, cb = st.columns(2)
+with ca:
+    st.subheader(f"Income  ({len(income_df)} lines)")
     if not income_df.empty:
-        st.dataframe(
-            income_df[["transaction_date", "counterparty", "category", "amount", "currency"]]
-            .rename(columns={"transaction_date": "Date", "counterparty": "From",
-                             "category": "Category", "amount": "Amount", "currency": "CCY"})
-            .assign(Date=lambda d: d["Date"].dt.strftime("%Y-%m-%d"))
-            .sort_values("Amount", ascending=False),
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(income_df[["transaction_date","counterparty","amount"]]
+                     .assign(Date=income_df["transaction_date"].dt.strftime("%Y-%m-%d"))
+                     [["Date","counterparty","amount"]]
+                     .rename(columns={"counterparty":"From","amount":currency})
+                     .sort_values(currency, ascending=False),
+                     use_container_width=True, hide_index=True)
+with cb:
+    st.subheader(f"Expenses  ({len(opex_df)} lines)")
+    if not opex_df.empty:
+        st.dataframe(opex_df[["transaction_date","counterparty","amount"]]
+                     .assign(Date=opex_df["transaction_date"].dt.strftime("%Y-%m-%d"))
+                     [["Date","counterparty","amount"]]
+                     .rename(columns={"counterparty":"To","amount":currency})
+                     .sort_values(currency, ascending=False),
+                     use_container_width=True, hide_index=True)
 
-with col_b:
-    st.subheader(f"Expenses ({len(expense_df)} transactions)")
-    if not expense_df.empty:
-        st.dataframe(
-            expense_df[["transaction_date", "counterparty", "category", "amount", "currency"]]
-            .rename(columns={"transaction_date": "Date", "counterparty": "To",
-                             "category": "Category", "amount": "Amount", "currency": "CCY"})
-            .assign(Date=lambda d: d["Date"].dt.strftime("%Y-%m-%d"))
-            .sort_values("Amount", ascending=False),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-# ── CSV export ───────────────────────────────────────────────────────────────
 st.divider()
-csv = df[["transaction_date", "transaction_type", "counterparty", "category",
-          "amount", "currency", "description"]].copy()
+
+# ── Download ──────────────────────────────────────────────────────────────────
+report_path = Path(__file__).parent.parent.parent / "reports" / f"fy{fy}" / \
+              f"Helias_FY{fy}_Financial_Report_ETB.xlsx"
+if report_path.exists():
+    st.download_button(
+        f"⬇️  Download FY{fy} Excel Report",
+        report_path.read_bytes(),
+        file_name=report_path.name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+csv = df[["transaction_date","transaction_type","counterparty","category",
+          "amount","currency","description"]].copy()
 csv["transaction_date"] = csv["transaction_date"].dt.strftime("%Y-%m-%d")
-st.download_button(
-    "⬇️ Download CSV",
-    csv.to_csv(index=False),
-    file_name=f"income_statement_{period_label.replace(' ', '_')}.csv",
-    mime="text/csv",
-)
+st.download_button("⬇️  Download CSV", csv.to_csv(index=False),
+                   file_name=f"is_fy{fy}.csv", mime="text/csv")
